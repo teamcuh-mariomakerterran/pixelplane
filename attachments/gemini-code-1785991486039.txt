@@ -1,0 +1,36 @@
+===============================================================================
+PIXELPLANE SPATIAL DISTRICT: CHARACTER & ANIMATION PIPELINE
+===============================================================================
+
+[ZONE 1: DNA & MODULAR HUB]
+┌─────────────────────────────────────────┐
+│ Base Chassis (Root Sprite)              │
+│ ├── Modular Outfit Stack (Cyber Visor)  │
+│ ├── Weapon Anchor (Neon Blade)          │
+│ └── Palette Swatches (Global Color Map) │
+└─────────────────────────────────────────┘
+                   │
+                   ▼
+[ZONE 2: SPATIAL FACING MATRIX]
+┌─────────────────────────────────────────┐
+│ 8-Way Directional Grid (N, NE, E, SE...)│
+│ └── Auto-Flip Mirror Nodes (East ➔ West)│
+└─────────────────────────────────────────┘
+
+[ZONE 3: ANIMATION STRIP FIELDS]
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ Idle State Strip:    [ Frame 1 ] [ Frame 2 ] [ Frame 3 ] [ Frame 4 ] [ ▶ ]  │
+│ Walk State Strip:    [ Frame 1 ] [ Frame 2 ] [ Frame 3 ] [ Frame 4 ] [ ▶ ]  │
+│ Attack_01 Strip:     [ Frame 1 ] [ Frame 2 ] [ Frame 3 ] [ Frame 4 ] [ ▶ ]  │
+│ └── Secondary Bake:  [ Cape Sway 1 ] [ Cape Sway 2 ] [ Cape Sway 3 ]        │
+└─────────────────────────────────────────────────────────────────────────────┘
+                   │
+                   ▼
+[ZONE 4: SPATIAL LOGIC SPINE & COLLISION]
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ State Pad: [ Attack_01 ]                                                    │
+│ ├── Frame 1 Collision: ( Green Hurtbox )                                   │
+│ ├── Frame 3 Collision: ( RED HITBOX! ) ──[Wire]──> Event: Damage Node       │
+│ └── State Transition:  Attack_01 ──[Wire: On_Anim_End]──> Idle              │
+└─────────────────────────────────────────────────────────────────────────────┘
+===============================================================================

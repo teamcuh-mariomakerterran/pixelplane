@@ -1,0 +1,461 @@
+{
+  "name": "PixelPlane Starter Pack",
+  "version": "1.0.0",
+  "license": "Bundled free-use examples for PixelPlane \u2014 create, remix, ship in your games.",
+  "items": [
+    {
+      "id": "rat_ninja_front",
+      "name": "Rat Ninja \u2014 Front Idle",
+      "src": "/starter-pack/characters/rat_ninja_front_idle.jpg",
+      "category": "characters",
+      "tags": [
+        "rat",
+        "ninja",
+        "idle",
+        "front"
+      ],
+      "kind": "sprite"
+    },
+    {
+      "id": "rat_ninja_back",
+      "name": "Rat Ninja \u2014 Back Idle",
+      "src": "/starter-pack/characters/rat_ninja_back_idle.jpg",
+      "category": "characters",
+      "tags": [
+        "rat",
+        "ninja",
+        "idle",
+        "back"
+      ],
+      "kind": "sprite"
+    },
+    {
+      "id": "rat_ninja_step",
+      "name": "Rat Ninja \u2014 Step",
+      "src": "/starter-pack/characters/rat_ninja_step.jpg",
+      "category": "characters",
+      "tags": [
+        "rat",
+        "walk"
+      ],
+      "kind": "sprite"
+    },
+    {
+      "id": "rat_ninja_right",
+      "name": "Rat Ninja \u2014 Face Right",
+      "src": "/starter-pack/characters/rat_ninja_face_right.png",
+      "category": "characters",
+      "tags": [
+        "rat",
+        "facing"
+      ],
+      "kind": "sprite"
+    },
+    {
+      "id": "rat_ninja_left",
+      "name": "Rat Ninja \u2014 Face Left",
+      "src": "/starter-pack/characters/rat_ninja_face_left.png",
+      "category": "characters",
+      "tags": [
+        "rat",
+        "facing"
+      ],
+      "kind": "sprite"
+    },
+    {
+      "id": "rat_ninja_attack",
+      "name": "Rat Ninja \u2014 Attack",
+      "src": "/starter-pack/characters/rat_ninja_attack.png",
+      "category": "characters",
+      "tags": [
+        "rat",
+        "attack",
+        "sword"
+      ],
+      "kind": "sprite"
+    },
+    {
+      "id": "zero_exe",
+      "name": "zeRo.exe",
+      "src": "/starter-pack/characters/zero_exe_idle.jpg",
+      "category": "characters",
+      "tags": [
+        "robot",
+        "cat",
+        "armor"
+      ],
+      "kind": "sprite"
+    },
+    {
+      "id": "zero_exe_sheet",
+      "name": "zeRo.exe Sheet",
+      "src": "/starter-pack/sheets/zero_exe_sheet.jpg",
+      "category": "sheets",
+      "tags": [
+        "robot",
+        "battle",
+        "variants"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "cat_sheet",
+      "name": "Cat Sprite Sheet",
+      "src": "/starter-pack/sheets/cat_sprite_sheet.png",
+      "category": "sheets",
+      "tags": [
+        "cat",
+        "animation",
+        "classic"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "rat_variants_1",
+      "name": "Rat Variants Stage 1",
+      "src": "/starter-pack/sheets/rat_variants_stage1.jpg",
+      "category": "sheets",
+      "tags": [
+        "rat",
+        "variants",
+        "side"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "rat_variants_2",
+      "name": "Rat Variants Stage 2",
+      "src": "/starter-pack/sheets/rat_variants_stage2.jpg",
+      "category": "sheets",
+      "tags": [
+        "rat",
+        "cyber",
+        "variants"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "starter_rats",
+      "name": "Starter Model Rats",
+      "src": "/starter-pack/sheets/starter_rats.png",
+      "category": "sheets",
+      "tags": [
+        "rat",
+        "goggles",
+        "cast"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "npc_sheet",
+      "name": "Robots & Cultists",
+      "src": "/starter-pack/sheets/npc_robots_cultists.png",
+      "category": "sheets",
+      "tags": [
+        "npc",
+        "robot",
+        "cultist"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "portraits_1",
+      "name": "Rat Portraits A",
+      "src": "/starter-pack/portraits/rat_portraits_1.jpg",
+      "category": "portraits",
+      "tags": [
+        "portrait",
+        "rat"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "portraits_2",
+      "name": "Rat Portraits B",
+      "src": "/starter-pack/portraits/rat_portraits_2.jpg",
+      "category": "portraits",
+      "tags": [
+        "portrait",
+        "neon"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "cyborg_rats",
+      "name": "Cyborg Rats",
+      "src": "/starter-pack/portraits/cyborg_rats.jpg",
+      "category": "portraits",
+      "tags": [
+        "cyborg",
+        "portrait"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "tech_rats",
+      "name": "Tech Rats",
+      "src": "/starter-pack/portraits/tech_rats.jpg",
+      "category": "portraits",
+      "tags": [
+        "tech",
+        "portrait"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "aviator_rats",
+      "name": "Aviator Rats",
+      "src": "/starter-pack/portraits/aviator_rats.jpg",
+      "category": "portraits",
+      "tags": [
+        "aviator",
+        "portrait"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "crew_rats",
+      "name": "Crew Rats",
+      "src": "/starter-pack/portraits/crew_rats.jpg",
+      "category": "portraits",
+      "tags": [
+        "crew",
+        "portrait"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "hoodie_rats",
+      "name": "Hoodie Rats",
+      "src": "/starter-pack/portraits/hoodie_rats.jpg",
+      "category": "portraits",
+      "tags": [
+        "hoodie",
+        "portrait"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "recon_rats",
+      "name": "Recon Rats",
+      "src": "/starter-pack/portraits/recon_rats.jpg",
+      "category": "portraits",
+      "tags": [
+        "recon",
+        "sniper"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "street_rats",
+      "name": "Street Rats",
+      "src": "/starter-pack/portraits/street_rats.jpg",
+      "category": "portraits",
+      "tags": [
+        "street",
+        "portrait"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "hero_cyborg",
+      "name": "Hero \u2014 Cyborg",
+      "src": "/starter-pack/portraits/hero_cyborg.jpg",
+      "category": "portraits",
+      "tags": [
+        "hero",
+        "bust"
+      ],
+      "kind": "sprite"
+    },
+    {
+      "id": "hero_goggles",
+      "name": "Hero \u2014 Goggles",
+      "src": "/starter-pack/portraits/hero_goggles.jpg",
+      "category": "portraits",
+      "tags": [
+        "hero",
+        "bust"
+      ],
+      "kind": "sprite"
+    },
+    {
+      "id": "hero_hoodie",
+      "name": "Hero \u2014 Hoodie",
+      "src": "/starter-pack/portraits/hero_hoodie.jpg",
+      "category": "portraits",
+      "tags": [
+        "hero",
+        "bust"
+      ],
+      "kind": "sprite"
+    },
+    {
+      "id": "hero_mystic",
+      "name": "Hero \u2014 Mystic",
+      "src": "/starter-pack/portraits/hero_mystic.jpg",
+      "category": "portraits",
+      "tags": [
+        "hero",
+        "bust"
+      ],
+      "kind": "sprite"
+    },
+    {
+      "id": "hero_headset",
+      "name": "Hero \u2014 Headset",
+      "src": "/starter-pack/portraits/hero_headset.jpg",
+      "category": "portraits",
+      "tags": [
+        "hero",
+        "bust"
+      ],
+      "kind": "sprite"
+    },
+    {
+      "id": "hero_scout",
+      "name": "Hero \u2014 Scout",
+      "src": "/starter-pack/portraits/hero_scout.jpg",
+      "category": "portraits",
+      "tags": [
+        "hero",
+        "bust"
+      ],
+      "kind": "sprite"
+    },
+    {
+      "id": "coats",
+      "name": "Coat Color Variants",
+      "src": "/starter-pack/props/coat_variants.jpg",
+      "category": "props",
+      "tags": [
+        "clothing",
+        "variants"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "neon_alley",
+      "name": "Neon Alley",
+      "src": "/starter-pack/environments/neon_alley.jpg",
+      "category": "environments",
+      "tags": [
+        "city",
+        "neon",
+        "bg"
+      ],
+      "kind": "scene"
+    },
+    {
+      "id": "rainy_city",
+      "name": "Rainy City",
+      "src": "/starter-pack/environments/rainy_city.jpg",
+      "category": "environments",
+      "tags": [
+        "city",
+        "rain",
+        "bg"
+      ],
+      "kind": "scene"
+    },
+    {
+      "id": "parallax_far",
+      "name": "Parallax Far \u2014 Rain City",
+      "src": "/starter-pack/environments/parallax_far_city.jpg",
+      "category": "environments",
+      "tags": [
+        "parallax",
+        "city",
+        "rain",
+        "far",
+        "bg"
+      ],
+      "kind": "scene"
+    },
+    {
+      "id": "parallax_mid",
+      "name": "Parallax Mid \u2014 Skyline",
+      "src": "/starter-pack/environments/parallax_mid_skyline.jpg",
+      "category": "environments",
+      "tags": [
+        "parallax",
+        "city",
+        "rain",
+        "mid",
+        "bg"
+      ],
+      "kind": "scene"
+    },
+    {
+      "id": "parallax_near",
+      "name": "Parallax Near \u2014 Rooftop",
+      "src": "/starter-pack/environments/parallax_near_rooftop.jpg",
+      "category": "environments",
+      "tags": [
+        "parallax",
+        "city",
+        "rain",
+        "near",
+        "bg"
+      ],
+      "kind": "scene"
+    },
+    {
+      "id": "parallax_set_rain",
+      "name": "Rain City Parallax Set (3 layers)",
+      "src": "/starter-pack/environments/parallax_mid_skyline.jpg",
+      "category": "environments",
+      "tags": [
+        "parallax",
+        "set",
+        "city",
+        "rain"
+      ],
+      "kind": "parallax-set"
+    },
+    {
+      "id": "anim_face_left",
+      "name": "Anim \u2014 Face Left",
+      "src": "/starter-pack/animations/Front_facing_Animation_Sprite_facing_left_1.png",
+      "category": "characters",
+      "tags": [
+        "anim",
+        "left"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "anim_face_right",
+      "name": "Anim \u2014 Face Right",
+      "src": "/starter-pack/animations/Front_facing_Animation_Sprite_facing_right_1.png",
+      "category": "characters",
+      "tags": [
+        "anim",
+        "right"
+      ],
+      "kind": "sheet"
+    },
+    {
+      "id": "anim_step",
+      "name": "Anim \u2014 Step Forward",
+      "src": "/starter-pack/animations/Front_facing_step_forward_1.jpg",
+      "category": "characters",
+      "tags": [
+        "anim",
+        "walk"
+      ],
+      "kind": "sprite"
+    },
+    {
+      "id": "anim_attack",
+      "name": "Anim \u2014 Attack",
+      "src": "/starter-pack/animations/rat_base_model_2_attacking.png",
+      "category": "characters",
+      "tags": [
+        "anim",
+        "attack"
+      ],
+      "kind": "sprite"
+    }
+  ]
+}

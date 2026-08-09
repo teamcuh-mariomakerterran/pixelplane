@@ -1,0 +1,20 @@
+===============================================================================
+PIXELPLANE SLICE DESIGN CONCEPTS
+===============================================================================
+
+[1. HITBOX ONION-SKINNING]
+Frame 1: [ Green Hurtbox ]
+Frame 2: [ Green Hurtbox ] ──(Ghost Copy)──> Frame 3: [ Active RED HITBOX ]
+
+[2. COMPOSITE GRAVITY RING]
+┌─────────────────────────────────────────┐
+│ Base Chassis (Root)                     │
+│   ( ( ( Radial Proximity Field ) ) )   │
+│            ▲                            │
+│   [ Cyber Visor Outfit Node ]           │
+└─────────────────────────────────────────┘
+
+[3. DUAL-MODE EXPORT BAKE TOGGLE]
+ ├── Mode A (Loose Layers): [Body.png] + [Hat.png] + [Data.json]
+ └── Mode B (Baked Atlas):  [Character_Full_Atlas.png]
+===============================================================================

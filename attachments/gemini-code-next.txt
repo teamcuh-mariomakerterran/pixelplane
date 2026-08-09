@@ -1,0 +1,21 @@
+===============================================================================
+PIXELPLANE NEXT REFINEMENTS: AUDIO ANCHORS, SPRINGS & LIVE DEBUG PULSE
+===============================================================================
+
+[1. FRAME-LEVEL AUDIO ANCHORS]
+State Pad: [ Walk ]
+├── Frame 1 ───> [ SFX Node: step_left.wav ]
+├── Frame 2
+├── Frame 3 ───> [ SFX Node: step_right.wav ]
+└── Frame 4
+
+[2. SECONDARY SPRING / JIGGLE NODES]
+Base Chassis Anchor: [ Head ] ──(Spring Node: Damping 0.8, Stiffness 120)──> Hair Sway Overlay
+
+[3. LIVE RUNTIME DEBUGGER (GHOST PULSE)]
+┌───────────────────────────┐                ┌───────────────────────────┐
+│ GAME PLAYTEST VIEW        │   Live State   │ PIXELPLANE CANVAS         │
+│ [ Player is Attacking ]   │ ──────────────>│ State Pad: [ Attack_01 ]  │
+│                           │  Sync Stream   │ ( Glowing Active Halo ✨ )│
+└───────────────────────────┘                └───────────────────────────┘
+===============================================================================

@@ -1,0 +1,31 @@
+===============================================================================
+PIXELPLANE CITY DISTRICT SPEC: TILE MUTATION & FOOTING COLLISION
+===============================================================================
+
+[1. WEIGHTED TILE MUTATION POOLS]
+Goal: Prevent repetitive grid patterns by assigning weighted art variants to 
+      a single auto-tile rule.
+
+Data Structure:
+  AutoTile_Rule: "Straight_Sidewalk"
+  ├── Variant_01: { sprite: "sidewalk_clean.png",  weight: 0.80 }
+  ├── Variant_02: { sprite: "sidewalk_crack.png",  weight: 0.10 }
+  ├── Variant_03: { sprite: "sidewalk_puddle.png", weight: 0.05 }
+  └── Variant_04: { sprite: "sidewalk_grate.png",  weight: 0.05 }
+
+Behavior:
+  - When the user draws tiles on the canvas, the engine rolls a weighted 
+    random selector to place variants automatically.
+  - Decal Pass: Free-floating layer allowing un-grid-aligned stamps 
+    (skid marks, litter, graffiti) over top of tile grids.
+
+[2. SUB-TILE FOOTING COLLISION & OVERHANGS]
+Goal: Prevent "invisible wall" collisions on 2.5D building roofs and awnings.
+
+Physics Rules:
+  - Tiles support custom Sub-Tile Collision Rects (e.g., a 64x64 tile has a 
+    64x20 Box2D collider pinned strictly to the bottom ground-contact edge).
+  - Z-Sorting / Overhangs: The top area of the tile above the footing line 
+    is rendered above the player/vehicle Z-index so characters can walk or 
+    drive under roof overhangs without hitting wall physics.
+===============================================================================

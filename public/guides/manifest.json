@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "name": "PixelPlane Useful Guides",
+  "description": "Copilot research dumps packaged for offline in-app reference \u2014 pixel art, tools, systems design, multiplayer, procgen.",
+  "count": 11,
+  "guides": [
+    {
+      "id": "pixel-art-asset-management-tools-indie-game-dev-comparison",
+      "title": "Pixel Art Asset Management Tools \u2014 Indie Game Dev Comparison",
+      "category": "pixel-art",
+      "format": "md",
+      "file": "pixel-art-asset-management-tools-indie-game-dev-comparison.md",
+      "source": "Pixel Art Asset Management Tools \u2014 Indie Game Dev Comparison.xlsx",
+      "summary": "Spreadsheet guide",
+      "chars": 8752
+    },
+    {
+      "id": "pixel-art-ui-button-design-guide-cyber-noir-retro-16-bit",
+      "title": "Pixel Art UI Button Design Guide \u2014 Cyber Noir & Retro 16-Bit",
+      "category": "pixel-art",
+      "format": "md",
+      "file": "pixel-art-ui-button-design-guide-cyber-noir-retro-16-bit.md",
+      "source": "Pixel Art UI Button Design Guide \u2014 Cyber Noir & Retro 16-Bit.docx",
+      "summary": "REFERENCE GUIDE \u00b7 INDIE GAME DEVELOPMENT & PIXEL ART",
+      "chars": 35730
+    },
+    {
+      "id": "sprite-sheet-tools-comparison-for-indie-game-developers",
+      "title": "Sprite Sheet Tools Comparison for Indie Game Developers",
+      "category": "pixel-art",
+      "format": "md",
+      "file": "sprite-sheet-tools-comparison-for-indie-game-developers.md",
+      "source": "Sprite Sheet Tools Comparison for Indie Game Developers.xlsx",
+      "summary": "Spreadsheet guide",
+      "chars": 11402
+    },
+    {
+      "id": "the-complete-pixel-art-game-asset-mastery-guide",
+      "title": "The Complete Pixel Art & Game Asset Mastery Guide",
+      "category": "pixel-art",
+      "format": "md",
+      "file": "the-complete-pixel-art-game-asset-mastery-guide.md",
+      "source": "The Complete Pixel Art & Game Asset Mastery Guide.docx",
+      "summary": "From Zero to Professional \u2014 A Full Instructional Manual for Indie Game Developers",
+      "chars": 170140
+    },
+    {
+      "id": "indie-game-feature-pipeline",
+      "title": "Indie Game Feature Pipeline",
+      "category": "pipeline",
+      "format": "md",
+      "file": "indie-game-feature-pipeline.md",
+      "source": "Indie Game Feature Pipeline.xlsx",
+      "summary": "Spreadsheet guide",
+      "chars": 2286
+    },
+    {
+      "id": "diegetic-save-systems-when-games-wear-their-data-on-their-sleeve",
+      "title": "Diegetic Save Systems \u2014 When Games Wear Their Data on Their Sleeve",
+      "category": "systems",
+      "format": "md",
+      "file": "diegetic-save-systems-when-games-wear-their-data-on-their-sleeve.md",
+      "source": "Diegetic Save Systems \u2014 When Games Wear Their Data on Their Sleeve.docx",
+      "summary": "RESEARCH REPORT  |  GAME DESIGN  |  JULY 2026",
+      "chars": 36287
+    },
+    {
+      "id": "rarity-system-design-document",
+      "title": "Rarity System Design Document",
+      "category": "systems",
+      "format": "md",
+      "file": "rarity-system-design-document.md",
+      "source": "Rarity System Design Document.docx",
+      "summary": "The rarity system serves as the foundational visual and gameplay language for communicating item value, scarcity, and power to the player. It operates across three simultaneous layers:",
+      "chars": 35113
+    },
+    {
+      "id": "whole-city-remembers-global-consequence-system",
+      "title": "Whole City Remembers \u2013 Global Consequence System",
+      "category": "systems",
+      "format": "md",
+      "file": "whole-city-remembers-global-consequence-system.md",
+      "source": "Whole City Remembers \u2013 Global Consequence System.xlsx",
+      "summary": "Spreadsheet guide",
+      "chars": 12578
+    },
+    {
+      "id": "chunk-stitching-test-cases-96x64-tile-chunks",
+      "title": "Chunk-Stitching Test Cases (96\u00d764 Tile Chunks)",
+      "category": "procgen",
+      "format": "md",
+      "file": "chunk-stitching-test-cases-96x64-tile-chunks.md",
+      "source": "Chunk-Stitching Test Cases (96x64 Tile Chunks).xlsx",
+      "summary": "QA tracker for 96\u00d764 tile chunk borders: roads, rails, buildings, districts, water, combined edges, null neighbors.",
+      "chars": 9324
+    },
+    {
+      "id": "procedural-city-generation-for-indie-games-research-compendium",
+      "title": "Procedural City Generation for Indie Games \u2014 Research Compendium",
+      "category": "procgen",
+      "format": "md",
+      "file": "procedural-city-generation-for-indie-games-research-compendium.md",
+      "source": "Procedural City Generation for Indie Games \u2014 Research Compendium.docx",
+      "summary": "Procedural City Generation for Indie Games",
+      "chars": 48110
+    },
+    {
+      "id": "1v1-online-multiplayer-for-mobile-card-games-indie-developer-reference-guide",
+      "title": "1v1 Online Multiplayer for Mobile Card Games \u2014 Indie Developer Reference Guide",
+      "category": "multiplayer",
+      "format": "md",
+      "file": "1v1-online-multiplayer-for-mobile-card-games-indie-developer-reference-guide.md",
+      "source": "1v1 Online Multiplayer for Mobile Card Games \u2014 Indie Developer Reference Guide.docx",
+      "summary": "Date: July 2026",
+      "chars": 54898
+    }
+  ]
+}

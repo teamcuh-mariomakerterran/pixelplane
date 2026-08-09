@@ -1,0 +1,92 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@theme {
+  --color-bg: #0e1014;
+  --color-bg-elevated: #151920;
+  --color-surface: #1a1f28;
+  --color-surface-2: #222833;
+  --color-surface-3: #2a3140;
+  --color-fg: #e8eaef;
+  --color-muted: #8b93a7;
+  --color-subtle: #5c6578;
+  --color-border: #2c3342;
+  --color-border-strong: #3d4658;
+  --color-accent: #e8a838;
+  --color-accent-hover: #f0b84a;
+  --color-accent-fg: #1a1408;
+  --color-cyan: #3ecfcf;
+  --color-danger: #e85d5d;
+  --color-success: #4ecb71;
+  --color-tool: #1e2430;
+  --color-tool-active: #e8a838;
+  --color-checker-a: #1c212b;
+  --color-checker-b: #161b24;
+  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 18px;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    font-family: var(--font-sans);
+    background: var(--color-bg);
+    color: var(--color-fg);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  input,
+  textarea,
+  select {
+    font: inherit;
+  }
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border-strong);
+    border-radius: 4px;
+  }
+}
+
+/* Pixel canvas never softens */
+.pixel-canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* Checkerboard for transparency */
+.checker-bg {
+  background-color: var(--color-checker-a);
+  background-image:
+    linear-gradient(45deg, var(--color-checker-b) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--color-checker-b) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--color-checker-b) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--color-checker-b) 75%);
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+}
