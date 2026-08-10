@@ -98,6 +98,14 @@ export function TopBar() {
         <div className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-sm)] bg-accent text-sm font-semibold text-accent-fg">
           P
         </div>
+        <button
+          type="button"
+          title="Command palette (Ctrl+K)"
+          onClick={() => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true }))}
+          className="hidden items-center gap-1 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-subtle hover:border-accent/40 hover:text-accent sm:inline-flex"
+        >
+          ⌘K
+        </button>
         <div className="hidden sm:block">
           <div className="text-sm font-semibold tracking-tight text-fg">PixelPlane</div>
           <div className="-mt-0.5 text-[10px] text-subtle">

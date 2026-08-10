@@ -226,7 +226,16 @@ export function CanvasWorkspace() {
         0,
       );
       ctx.imageSmoothingEnabled = false;
-      ctx.fillStyle = "#0b0d12";
+      // deep void + subtle vignette pulse (post-calamity atmosphere)
+      const tPulse = (performance.now() % 8000) / 8000;
+      const pulse = 0.5 + 0.5 * Math.sin(tPulse * Math.PI * 2);
+      ctx.fillStyle = "#0a0c11";
+      ctx.fillRect(0, 0, sw, sh);
+      const grd = ctx.createRadialGradient(sw * 0.5, sh * 0.45, sw * 0.1, sw * 0.5, sh * 0.5, sw * 0.75);
+      grd.addColorStop(0, "rgba(20,28,40,0)");
+      grd.addColorStop(0.7, `rgba(12,16,28,${0.15 + pulse * 0.05})`);
+      grd.addColorStop(1, "rgba(6,8,14,0.55)");
+      ctx.fillStyle = grd;
       ctx.fillRect(0, 0, sw, sh);
 
       // world transform
@@ -243,7 +252,7 @@ export function CanvasWorkspace() {
         const worldB = (sh - cam.y) / cam.zoom;
         const x0 = Math.floor(worldL / gs) * gs;
         const y0 = Math.floor(worldT / gs) * gs;
-        ctx.strokeStyle = "rgba(255,255,255,0.04)";
+        ctx.strokeStyle = `rgba(62,207,207,${0.03 + pulse * 0.02})`;
         ctx.lineWidth = 1 / cam.zoom;
         ctx.beginPath();
         for (let x = x0; x < worldR; x += gs) {
@@ -256,7 +265,8 @@ export function CanvasWorkspace() {
         }
         ctx.stroke();
         // major axes
-        ctx.strokeStyle = "rgba(232,168,56,0.18)";
+        ctx.strokeStyle = `rgba(232,168,56,${0.14 + pulse * 0.08})`;
+        // cyan secondary major every 8 cells drawn via minor boost below
         ctx.beginPath();
         ctx.moveTo(0, worldT);
         ctx.lineTo(0, worldB);

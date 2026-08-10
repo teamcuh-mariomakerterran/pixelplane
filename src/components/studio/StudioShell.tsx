@@ -26,6 +26,8 @@ import { MemoryWebPanel } from "./MemoryWebPanel";
 import { CharacterDistrictPanel } from "./CharacterDistrictPanel";
 import { CityDistrictPanel } from "./CityDistrictPanel";
 import { CityEngineView } from "@/components/engine/CityEngineView";
+import { CommandPalette } from "./CommandPalette";
+import { PaletteGravityBar } from "./PaletteGravityBar";
 import { useSpatialNav } from "@/store/spatial-nav";
 import { usePlaneSystems } from "@/store/plane-systems";
 import { useMemoryWeb } from "@/store/memory-web";
@@ -123,7 +125,7 @@ export function StudioShell() {
       setReady(true);
       // intro tip for bookmarks once
       setTimeout(() => {
-        useHotkeys.getState().pushTip("bookmarks", { x: 280, y: 72 });
+        useHotkeys.getState().pushTip("command_palette", { x: 280, y: 72 });
         // minimap tip deferred — one tip at a time; shows when user first pans near it via FEATURE later
       }, 1200);
     })();
@@ -359,6 +361,8 @@ function AppModeRoot({ ready }: { ready: boolean }) {
           <MiniMap />
           <BookmarkStrip />
           <CanvasOverlays />
+          <PaletteGravityBar />
+          <CommandPalette />
           <SharedPlaneHost />
           <SharedPlanePanel />
           <StatusBar />

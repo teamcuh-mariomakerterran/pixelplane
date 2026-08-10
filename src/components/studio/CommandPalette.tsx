@@ -1,0 +1,347 @@
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { useStudio } from "@/store/studio";
+import { useHotkeys } from "@/store/hotkeys";
+import { useWaveA } from "@/store/wave-a";
+import { useMemoryWeb } from "@/store/memory-web";
+import { useCharacterDistrict } from "@/store/character-district";
+import { useCityDistrict } from "@/store/city-district";
+import { usePlaneSystems } from "@/store/plane-systems";
+import { useCollab } from "@/store/collab";
+import { TOOL_LABELS } from "@/lib/hotkeys/defaults";
+import type { ToolId } from "@/lib/pixel/types";
+import { summonNightDistrict } from "@/lib/packs/night-district";
+import { pickSnapshot, saveSnapshot } from "@/lib/pixel/persist";
+import { Keyboard } from "lucide-react";
+
+type Entry = {
+  id: string;
+  group: string;
+  label: string;
+  hint?: string;
+  keywords?: string;
+  run: () => void;
+};
+
+/**
+ * God-mode command palette — Ctrl/Cmd+K.
+ * Custom (no cmdk) for stable SSR/HMR. Post-calamity power surface.
+ */
+export function CommandPalette() {
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [active, setActive] = useState(0);
+
+  const entries = useMemo<Entry[]>(() => {
+    const tools: Entry[] = (Object.entries(TOOL_LABELS) as [ToolId, string][]).map(
+      ([id, label]) => ({
+        id: `tool-${id}`,
+        group: "Tools",
+        label,
+        hint: id,
+        keywords: `tool ${id} ${label}`,
+        run: () => useStudio.getState().setTool(id),
+      }),
+    );
+
+    const cams: Entry[] = [1, 2, 3, 4, 5, 6, 7, 8].map((slot) => ({
+      id: `cam-${slot}`,
+      group: "Camera ghosts",
+      label: `Jump F${slot}`,
+      keywords: `bookmark camera f${slot}`,
+      run: () => {
+        const bm = useHotkeys.getState().jumpBookmark(slot);
+        if (bm) {
+          useStudio.getState().setCamera({ x: bm.x, y: bm.y, zoom: bm.zoom });
+          useStudio.getState().setStatus(`Jumped to location F${slot}`);
+        } else {
+          useStudio.getState().setStatus(`F${slot} empty · Ctrl+F${slot} to save`);
+        }
+      },
+    }));
+
+    const sig: Entry[] = [
+      {
+        id: "night",
+        group: "Signature",
+        label: "Summon Night District",
+        hint: "cyberpunk pack",
+        keywords: "night district cyberpunk pack summon city",
+        run: () => {
+          void summonNightDistrict();
+        },
+      },
+      {
+        id: "heat",
+        group: "Signature",
+        label: "Toggle wire heat map",
+        keywords: "heat wire orphan",
+        run: () => {
+          const s = useWaveA.getState();
+          s.setShowWireHeatMap(!s.showWireHeatMap);
+          useStudio
+            .getState()
+            .setStatus(
+              !s.showWireHeatMap
+                ? "Wire heat map on · orphans run hot"
+                : "Wire heat map off",
+            );
+        },
+      },
+      {
+        id: "ghosts",
+        group: "Signature",
+        label: "Toggle session ghosts",
+        keywords: "ghost session bookmark",
+        run: () => {
+          const s = useWaveA.getState();
+          s.setShowSessionGhosts(!s.showSessionGhosts);
+        },
+      },
+      {
+        id: "viewport",
+        group: "Signature",
+        label: "Game viewport tool",
+        keywords: "ghost of the game viewport",
+        run: () => useStudio.getState().setTool("game-viewport"),
+      },
+      {
+        id: "stamp",
+        group: "Signature",
+        label: "Constraint stamp tool",
+        keywords: "stamp cage pixel",
+        run: () => useStudio.getState().setTool("constraint-stamp"),
+      },
+      {
+        id: "engine",
+        group: "Suite",
+        label: "Enter City Engine",
+        hint: "play",
+        keywords: "engine city drive car",
+        run: () => useStudio.getState().setAppMode("engine"),
+      },
+      {
+        id: "chardist",
+        group: "Suite",
+        label: "Character District",
+        keywords: "anim district hitbox",
+        run: () => {
+          const st = useCharacterDistrict.getState();
+          if (!st.districts.length) st.spawnDistrict();
+          st.setShowPanel(true);
+        },
+      },
+      {
+        id: "citydist",
+        group: "Suite",
+        label: "City District",
+        keywords: "tiles footing",
+        run: () => useCityDistrict.getState().setShowPanel(true),
+      },
+      {
+        id: "memory",
+        group: "Suite",
+        label: "Memory Web",
+        keywords: "npc faction memory",
+        run: () => useMemoryWeb.getState().setShowPanel(true),
+      },
+      {
+        id: "gen",
+        group: "Suite",
+        label: "AI Generate",
+        keywords: "generate prompt",
+        run: () => useStudio.getState().setShowGenerate(true),
+      },
+      {
+        id: "starter",
+        group: "Suite",
+        label: "Starter pack",
+        keywords: "starter rats",
+        run: () => useStudio.getState().setShowStarterPack(true),
+      },
+      {
+        id: "chunks",
+        group: "Plane systems",
+        label: "Toggle chunk grid",
+        keywords: "interest d10x chunks",
+        run: () => {
+          const s = usePlaneSystems.getState();
+          s.setShowChunkGrid(!s.showChunkGrid);
+        },
+      },
+      {
+        id: "exportmap",
+        group: "Plane systems",
+        label: "Toggle export map",
+        keywords: "export spatial map",
+        run: () => {
+          const s = usePlaneSystems.getState();
+          s.setShowExportMap(!s.showExportMap);
+        },
+      },
+      {
+        id: "collab",
+        group: "Plane systems",
+        label: "Shared plane panel",
+        keywords: "collab multiplayer",
+        run: () => useCollab.getState().setShowPanel(true),
+      },
+      {
+        id: "save",
+        group: "Plane systems",
+        label: "Save project",
+        keywords: "save persist",
+        run: () => {
+          const s = useStudio.getState();
+          void saveSnapshot(pickSnapshot(s)).then(() =>
+            s.setStatus("Project saved to browser storage"),
+          );
+        },
+      },
+      {
+        id: "help",
+        group: "Plane systems",
+        label: "Help",
+        keywords: "help hotkeys",
+        run: () => useStudio.getState().setShowHelp(true),
+      },
+    ];
+
+    return [...sig, ...tools, ...cams];
+  }, []);
+
+  const filtered = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    if (!needle) return entries;
+    return entries.filter((e) =>
+      `${e.label} ${e.hint ?? ""} ${e.keywords ?? ""} ${e.group}`
+        .toLowerCase()
+        .includes(needle),
+    );
+  }, [entries, q]);
+
+  useEffect(() => {
+    setActive(0);
+  }, [q, open]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setOpen((v) => !v);
+        setQ("");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const close = useCallback(() => {
+    setOpen(false);
+    setQ("");
+  }, []);
+
+  const exec = useCallback(
+    (entry: Entry) => {
+      entry.run();
+      close();
+    },
+    [close],
+  );
+
+  if (!open) return null;
+
+  // group for display
+  const groups: { name: string; items: Entry[] }[] = [];
+  for (const e of filtered) {
+    const g = groups.find((x) => x.name === e.group);
+    if (g) g.items.push(e);
+    else groups.push({ name: e.group, items: [e] });
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex items-start justify-center bg-bg/70 px-3 pt-[12vh] backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Command palette"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 cursor-default"
+        aria-label="Close"
+        onClick={close}
+      />
+      <div className="relative z-10 w-full max-w-xl overflow-hidden rounded-[var(--radius-lg)] border border-border-strong bg-bg-elevated shadow-2xl">
+        <div className="flex items-center gap-2 border-b border-border px-3">
+          <Keyboard size={14} className="text-accent" />
+          <input
+            autoFocus
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Escape") {
+                e.preventDefault();
+                close();
+              } else if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setActive((i) => Math.min(filtered.length - 1, i + 1));
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setActive((i) => Math.max(0, i - 1));
+              } else if (e.key === "Enter") {
+                e.preventDefault();
+                const hit = filtered[active];
+                if (hit) exec(hit);
+              }
+            }}
+            placeholder="Summon anything… tools, engine, packs, ghosts"
+            className="h-11 w-full bg-transparent text-sm text-fg outline-none placeholder:text-subtle"
+          />
+          <kbd className="hidden rounded border border-border px-1.5 py-0.5 font-mono text-[10px] text-subtle sm:inline">
+            esc
+          </kbd>
+        </div>
+        <div className="max-h-[min(420px,55vh)] overflow-y-auto p-2">
+          {filtered.length === 0 && (
+            <div className="px-3 py-6 text-center text-xs text-muted">
+              No match — try “night”, “engine”, “heat”, “brush”
+            </div>
+          )}
+          {groups.map((g) => (
+            <div key={g.name} className="mb-2">
+              <div className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-subtle">
+                {g.name}
+              </div>
+              {g.items.map((item) => {
+                const idx = filtered.indexOf(item);
+                const sel = idx === active;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onMouseEnter={() => setActive(idx)}
+                    onClick={() => exec(item)}
+                    className={
+                      sel
+                        ? "flex w-full items-center gap-2 rounded-[var(--radius-sm)] bg-accent/15 px-2 py-2 text-left text-sm text-fg"
+                        : "flex w-full items-center gap-2 rounded-[var(--radius-sm)] px-2 py-2 text-left text-sm text-muted hover:bg-surface-2 hover:text-fg"
+                    }
+                  >
+                    <span className="flex-1 truncate">{item.label}</span>
+                    {item.hint && (
+                      <span className="font-mono text-[10px] text-subtle">{item.hint}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+        <div className="flex items-center justify-between border-t border-border px-3 py-1.5 text-[10px] text-subtle">
+          <span>Post-Calamity command surface</span>
+          <span className="font-mono text-accent/80">Ctrl+K</span>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -30,6 +30,10 @@
    - §12 user tips if user-facing
 4. Prefer finishing over stubs. If a stub is unavoidable: mark `STUB`, owner, next step, file path.
 
+### First Calamity (epoch · 2026-08-09)
+Partial writes wiped core plane files with **no version control**. Recovery succeeded; git init followed.
+**Rule forever:** commit after every real ship. Freestyle hard — crash soft.
+
 ### Sandbox / preview contract (platform)
 - App serves on **`0.0.0.0:8080`** via Vite; platform live preview discovers it.
 - **`/workspace/startup.sh`** must start the dev server idempotently (platform revive).
@@ -145,6 +149,15 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 ---
 
 ## 3. Changelog (newest first)
+
+### 2026-08-10 — Post-Calamity Ascension (freestyle era)
+- **Doctrine:** freestyle is good; the First Calamity taught us backups. Git is mandatory.
+- **First Calamity (record):** mid-Wave-A partial file writes destroyed `CanvasWorkspace`, hotkey defaults, briefly studio store — no git yet. Rebuilt from bundle + architecture knowledge. **Matter of record: never again without commits.**
+- **Command palette:** Ctrl/Cmd+K god surface — tools, suite, Wave A, F-jumps, Night District.
+- **Palette Gravity:** nearby boards emit living swatches under the brush (Magnet HUD).
+- **Night District pack:** cyberpunk hero/blocks/roads/fleet/FX → `/public/packs/night-district` · Summon onto plane.
+- **Plane atmosphere:** void vignette + cyan/amber grid pulse.
+- **City Engine chrome:** Birthplace · freestyle era label.
 
 ### 2026-08-10 — Studio polish pass
 - Tips no longer cover Plane systems dock (dock z-[45], tip clamp, one tip at a time)

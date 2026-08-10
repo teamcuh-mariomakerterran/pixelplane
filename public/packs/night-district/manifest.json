@@ -1,0 +1,44 @@
+{
+  "id": "night-district",
+  "name": "Night District Pack",
+  "version": 1,
+  "description": "Cyberpunk streets, vehicles, interiors, hero \u2014 freestyle post-calamity drop",
+  "assets": [
+    {
+      "file": "13ylw.jpg",
+      "kind": "image"
+    },
+    {
+      "file": "2HHGu.jpg",
+      "kind": "image"
+    },
+    {
+      "file": "Cyberpunk_male_main_character.gif",
+      "kind": "image"
+    },
+    {
+      "file": "DjBuP.jpg",
+      "kind": "image"
+    },
+    {
+      "file": "TDOIv.jpg",
+      "kind": "image"
+    },
+    {
+      "file": "a7Qbn.jpg",
+      "kind": "image"
+    },
+    {
+      "file": "a_pixel_explosion_v1.gif",
+      "kind": "image"
+    },
+    {
+      "file": "cyberpunk_male_main_character.png",
+      "kind": "image"
+    },
+    {
+      "file": "hCfOH.jpg",
+      "kind": "image"
+    }
+  ]
+}

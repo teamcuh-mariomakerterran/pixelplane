@@ -276,6 +276,22 @@ export function defaultBindings(): Binding[] {
 }
 
 export const FEATURE_TIPS: Record<string, FeatureTip> = {
+  command_palette: {
+    title: "Command palette",
+    body: "Ctrl+K opens the god surface — tools, City Engine, Night District, ghosts, heat, camera jumps.",
+    creative: "Type what you want. The plane listens.",
+  },
+  palette_gravity: {
+    title: "Palette gravity",
+    body: "Nearby artboards pull colors into a living field under your brush. Click a swatch to lock it.",
+    creative: "Paint with the neighborhood, not just the tray.",
+  },
+  night_district: {
+    title: "Night District",
+    body: "Summon a cyberpunk pack onto the plane — hero, blocks, roads, fleet, FX — as real artboards.",
+    creative: "Your city assets deserve district real estate.",
+  },
+
   select: {
     title: "Select",
     body: "Click artboards, anims, wires, quests, and props. Drag to move what you grab.",

@@ -565,10 +565,10 @@ export function CityEngineView() {
           </button>
           <div className="rounded-md border border-white/10 bg-black/55 px-2.5 py-1.5 backdrop-blur">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">
-              City Engine
+              City Engine · Birthplace
             </div>
-            <div className="text-[10px] text-white/70">
-              {hud.profile} · Play Ghost on exit
+            <div className="text-[10px] text-cyan-300/80">
+              {hud.profile} · freestyle era · ghost trail on exit
             </div>
           </div>
           <div className="flex items-center gap-1 rounded-md border border-violet-500/30 bg-black/55 px-2 py-1 text-[10px] text-violet-200 backdrop-blur">

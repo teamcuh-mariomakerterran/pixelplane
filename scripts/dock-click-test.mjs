@@ -1,0 +1,22 @@
+import { chromium } from "playwright";
+const b = await chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+const p = await b.newPage({ viewport: { width: 1440, height: 900 } });
+const errs = [];
+p.on("pageerror", (e) => errs.push(String(e)));
+p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+await p.goto("http://127.0.0.1:8080/", { waitUntil: "networkidle", timeout: 45000 });
+await p.waitForTimeout(1500);
+// place viewport tip then ensure heat still clickable
+await p.locator('[title="Ghost of the game (viewport) (U)"]').click();
+const box = await p.locator("canvas").first().boundingBox();
+await p.mouse.click(box.x + box.width * 0.35, box.y + box.height * 0.4);
+await p.waitForTimeout(400);
+await p.locator('[title="Wire heat map — feed planes glow by coverage / orphans"]').click({ timeout: 5000 });
+await p.waitForTimeout(200);
+const header = await p.locator("header").innerText();
+const statusBar = await p.locator("main").innerText();
+await p.screenshot({ path: "/workspace/screenshots/studio-polish-dock.png" });
+const heatOk = /Wire heat map on|orphans run hot/i.test(header + statusBar);
+console.log(JSON.stringify({ heatOk, errs, snippet: (header + " " + statusBar).replace(/\s+/g, " ").slice(0, 200) }));
+await b.close();
+process.exit(errs.length || !heatOk ? 2 : 0);
