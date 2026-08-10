@@ -1,8 +1,8 @@
 {
   "id": "goodies-drop",
   "name": "Goodies Drop \u2014 Night Ops",
-  "version": 3,
-  "description": "Wave1-3: gear, skyline buildings, brew, quest tools",
+  "version": 4,
+  "description": "Wave1-4: gear, skyline, citykit (vehicles/roads/buildings sheets)",
   "assets": [
     {
       "file": "buildings/industrial_hangar_ship.jpg",
@@ -39,6 +39,102 @@
     {
       "file": "buildings/wMqaj.jpg",
       "kind": "buildings"
+    },
+    {
+      "file": "citykit/airport_hangars.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/cars_clean_damaged.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/cars_neon_topdown.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/cars_weaponized.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/compounds_plazas.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/connectors_roads_rails.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/facades_neon_colorways.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/hangars_cranes.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/houses_suburban.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/industrial_blocks.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/industrial_plant.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/mansions_gothic_cyber.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/modular_blocks_low.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/modular_buildings_mid.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/road_markings.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/roofs_hvac_solar.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/rooftop_modules.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/rooftops_neon_antenna.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/street_details_debris.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/towers_neon_variants.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/towers_purple_front.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/trains_containers.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/truck_pickup_8dir.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/walkways_stations.jpg",
+      "kind": "citykit"
     },
     {
       "file": "creatures/fish_and_tech.png",

@@ -11,7 +11,7 @@ import { useSignature } from "@/store/signature";
 import { TOOL_LABELS } from "@/lib/hotkeys/defaults";
 import type { ToolId } from "@/lib/pixel/types";
 import { summonNightDistrict } from "@/lib/packs/night-district";
-import { summonGoodiesDrop, summonSkylineSet } from "@/lib/packs/goodies";
+import { summonGoodiesDrop, summonSkylineSet, summonCityKit } from "@/lib/packs/goodies";
 import { stampTimeline } from "@/store/timeline";
 import { useKernels } from "@/store/kernels";
 import { useSoundSprites } from "@/store/sound-sprites";
@@ -144,8 +144,8 @@ export function CommandPalette() {
         id: "goodies",
         group: "Signature",
         label: "Summon Goodies Drop",
-        hint: "wave 1–3 · arsenal · brew · skyline",
-        keywords: "goodies gear weapons roads ui buildings inventory skyline",
+        hint: "wave 1–4 · arsenal · brew · skyline · city",
+        keywords: "goodies gear weapons roads ui buildings inventory skyline city",
         run: () => {
           void summonGoodiesDrop().then((n) => {
             if (n) stampTimeline("Goodies Drop", `${n} boards`);
@@ -161,6 +161,18 @@ export function CommandPalette() {
         run: () => {
           void summonSkylineSet().then((n) => {
             if (n) stampTimeline("Skyline kit", `${n} buildings`);
+          });
+        },
+      },
+      {
+        id: "citykit",
+        group: "Signature",
+        label: "Summon City kit only",
+        hint: "24 sheets · cars · rails · modular",
+        keywords: "city kit cars vehicles roads trains towers industrial modular hangars",
+        run: () => {
+          void summonCityKit().then((n) => {
+            if (n) stampTimeline("City kit", `${n} sheets`);
           });
         },
       },

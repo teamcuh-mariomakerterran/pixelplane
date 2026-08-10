@@ -1,6 +1,6 @@
 /**
- * Goodies Drop — Night Ops pack (Brian drops wave 1–3).
- * Gear, skyline, props, quest items, brew/cook drinks → plane boards.
+ * Goodies Drop — Night Ops pack (Brian drops wave 1–4).
+ * Gear, skyline, citykit sheets, props, brew → plane boards.
  */
 
 import { useStudio } from "@/store/studio";
@@ -60,7 +60,7 @@ const LAYOUT_CORE: Item[] = [
   { file: "props/psu_fan_cube.jpg", name: "Props · PSU fan cube", x: 1400, y: 2460, max: 160 },
 ];
 
-/** Wave 3 — isometric skyline buildings (individual props). */
+/** Wave 3 — isometric skyline buildings. */
 const LAYOUT_SKYLINE: Item[] = [
   { file: "skyline/corp_tower.jpg", name: "Skyline · Corp tower", x: 0, y: 0, max: 160 },
   { file: "skyline/control_tower.jpg", name: "Skyline · Control tower", x: 200, y: 0, max: 160 },
@@ -77,6 +77,39 @@ const LAYOUT_SKYLINE: Item[] = [
   { file: "skyline/diamond_hq.jpg", name: "Skyline · Diamond HQ", x: 1000, y: 240, max: 150 },
   { file: "skyline/sat_hub.jpg", name: "Skyline · Satellite hub", x: 1200, y: 240, max: 160 },
   { file: "skyline/fire_escape_block.jpg", name: "Skyline · Fire-escape block", x: 1400, y: 240, max: 160 },
+];
+
+/** Wave 4 — magenta city kit sheets (vehicles, roads, modular city). */
+const LAYOUT_CITYKIT: Item[] = [
+  // vehicles
+  { file: "citykit/cars_neon_topdown.jpg", name: "City · neon cars topdown", x: 0, y: 0, max: 340 },
+  { file: "citykit/cars_clean_damaged.jpg", name: "City · clean/damaged cars", x: 380, y: 0, max: 300 },
+  { file: "citykit/cars_weaponized.jpg", name: "City · weaponized cars", x: 720, y: 0, max: 280 },
+  { file: "citykit/truck_pickup_8dir.jpg", name: "City · pickup 8-dir", x: 1040, y: 0, max: 300 },
+  { file: "citykit/trains_containers.jpg", name: "City · trains & containers", x: 1380, y: 0, max: 280 },
+  // roads / connectors
+  { file: "citykit/connectors_roads_rails.jpg", name: "City · road/rail connectors", x: 0, y: 360, max: 340 },
+  { file: "citykit/road_markings.jpg", name: "City · road markings", x: 380, y: 360, max: 300 },
+  { file: "citykit/street_details_debris.jpg", name: "City · street debris", x: 720, y: 360, max: 280 },
+  { file: "citykit/walkways_stations.jpg", name: "City · walkways & stations", x: 1040, y: 360, max: 300 },
+  // towers / facades
+  { file: "citykit/towers_purple_front.jpg", name: "City · purple towers", x: 0, y: 720, max: 300 },
+  { file: "citykit/towers_neon_variants.jpg", name: "City · neon tower variants", x: 340, y: 720, max: 300 },
+  { file: "citykit/facades_neon_colorways.jpg", name: "City · neon facades", x: 680, y: 720, max: 300 },
+  { file: "citykit/mansions_gothic_cyber.jpg", name: "City · gothic cyber mansions", x: 1020, y: 720, max: 320 },
+  { file: "citykit/houses_suburban.jpg", name: "City · suburban houses", x: 1380, y: 720, max: 260 },
+  // modular / industrial
+  { file: "citykit/modular_buildings_mid.jpg", name: "City · modular mid", x: 0, y: 1100, max: 340 },
+  { file: "citykit/modular_blocks_low.jpg", name: "City · modular low", x: 380, y: 1100, max: 320 },
+  { file: "citykit/industrial_blocks.jpg", name: "City · industrial blocks", x: 740, y: 1100, max: 300 },
+  { file: "citykit/industrial_plant.jpg", name: "City · industrial plant", x: 1080, y: 1100, max: 320 },
+  { file: "citykit/hangars_cranes.jpg", name: "City · hangars & cranes", x: 1440, y: 1100, max: 280 },
+  // roofs / air / compounds
+  { file: "citykit/rooftop_modules.jpg", name: "City · rooftop modules", x: 0, y: 1480, max: 300 },
+  { file: "citykit/rooftops_neon_antenna.jpg", name: "City · neon rooftops", x: 340, y: 1480, max: 300 },
+  { file: "citykit/roofs_hvac_solar.jpg", name: "City · HVAC & solar roofs", x: 680, y: 1480, max: 300 },
+  { file: "citykit/airport_hangars.jpg", name: "City · airport & hangars", x: 1020, y: 1480, max: 300 },
+  { file: "citykit/compounds_plazas.jpg", name: "City · compounds & plazas", x: 1360, y: 1480, max: 300 },
 ];
 
 async function loadImage(url: string): Promise<HTMLImageElement> {
@@ -123,7 +156,7 @@ async function placeLayout(
   return placed;
 }
 
-/** Full dump wave 1–3. */
+/** Full dump wave 1–4. */
 export async function summonGoodiesDrop(): Promise<number> {
   const studio = useStudio.getState();
   const cam = studio.camera;
@@ -133,23 +166,24 @@ export async function summonGoodiesDrop(): Promise<number> {
 
   const a = await placeLayout(LAYOUT_CORE, ox, oy);
   const b = await placeLayout(LAYOUT_SKYLINE, ox, oy + 2800);
-  const placed = a + b;
+  const c = await placeLayout(LAYOUT_CITYKIT, ox, oy + 3400);
+  const placed = a + b + c;
 
   if (placed) {
-    studio.createWireZone(ox - 40, oy - 40, 1800, 3400, "environments");
+    studio.createWireZone(ox - 40, oy - 40, 1900, 5400, "environments");
     const zones = useStudio.getState().wireZones;
     const last = zones[zones.length - 1];
-    if (last) studio.renameWireZone(last.id, "Goodies · Night Ops (wave 1–3)");
-    studio.setStatus(`Goodies Drop · ${placed} boards · skyline + arsenal + brew`);
-    studio.setCamera({ x: -ox * z + 40, y: -oy * z + 40, zoom: Math.min(0.3, z) });
-    stampTimeline("Goodies wave 1–3", `${placed} boards`);
+    if (last) studio.renameWireZone(last.id, "Goodies · Night Ops (wave 1–4)");
+    studio.setStatus(`Goodies Drop · ${placed} boards · citykit + skyline + arsenal`);
+    studio.setCamera({ x: -ox * z + 40, y: -oy * z + 40, zoom: Math.min(0.22, z) });
+    stampTimeline("Goodies wave 1–4", `${placed} boards`);
   } else {
     studio.setStatus("Goodies pack failed to load");
   }
   return placed;
 }
 
-/** Just the isometric skyline set — faster, city-kit friendly. */
+/** Just the isometric skyline set. */
 export async function summonSkylineSet(): Promise<number> {
   const studio = useStudio.getState();
   const cam = studio.camera;
@@ -166,6 +200,27 @@ export async function summonSkylineSet(): Promise<number> {
     studio.setStatus(`Skyline kit · ${placed} buildings on plane`);
     studio.setCamera({ x: -ox * z + 40, y: -oy * z + 40, zoom: Math.min(0.55, z) });
     stampTimeline("Skyline kit", `${placed} buildings`);
+  }
+  return placed;
+}
+
+/** Wave 4 city kit only — vehicles, roads, modular city sheets. */
+export async function summonCityKit(): Promise<number> {
+  const studio = useStudio.getState();
+  const cam = studio.camera;
+  const z = cam.zoom || 1;
+  const ox = (-cam.x + 180) / z;
+  const oy = (-cam.y + 90) / z;
+
+  const placed = await placeLayout(LAYOUT_CITYKIT, ox, oy);
+  if (placed) {
+    studio.createWireZone(ox - 40, oy - 40, 1850, 1900, "environments");
+    const zones = useStudio.getState().wireZones;
+    const last = zones[zones.length - 1];
+    if (last) studio.renameWireZone(last.id, "City kit · vehicles · roads · modular");
+    studio.setStatus(`City kit · ${placed} sheets (cars, rails, towers, roofs)`);
+    studio.setCamera({ x: -ox * z + 40, y: -oy * z + 40, zoom: Math.min(0.35, z) });
+    stampTimeline("City kit", `${placed} sheets`);
   }
   return placed;
 }

@@ -150,6 +150,10 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 
 ## 3. Changelog (newest first)
 
+### 2026-08-10 — Goodies wave 4 · City kit
+- **24 magenta sheets:** neon/weaponized cars, 8-dir truck, trains/containers, road connectors, street debris, towers, gothic mansions, modular blocks, industrial plant, hangars/cranes, airport, rooftops, compounds
+- **Ctrl+K → city kit** (fast) · full goodies now wave 1–4
+
 ### 2026-08-10 — Goodies wave 3 · Skyline kit
 - **15 iso buildings:** Corp tower, Control, WARE 6×6, Plaza twins, Broadcast, Chrome Tools, Holo Gear, Core Stack, duplex, Data core, Beacon spire, Hab Fortress, Diamond HQ, Sat hub, fire-escape block + PSU fan prop
 - **Full brew station** art behind Brew kernel
