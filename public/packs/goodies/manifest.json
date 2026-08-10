@@ -1,8 +1,8 @@
 {
   "id": "goodies-drop",
   "name": "Goodies Drop \u2014 Night Ops",
-  "version": 4,
-  "description": "Wave1-4: gear, skyline, citykit (vehicles/roads/buildings sheets)",
+  "version": 5,
+  "description": "Wave1-5: gear, skyline, citykit (55 sheets), props, brew",
   "assets": [
     {
       "file": "buildings/industrial_hangar_ship.jpg",
@@ -45,6 +45,10 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/alleys_neon_graffiti.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/cars_clean_damaged.jpg",
       "kind": "citykit"
     },
@@ -57,6 +61,14 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/castles_dark_fort.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/civic_temples_topdown.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/compounds_plazas.jpg",
       "kind": "citykit"
     },
@@ -65,7 +77,35 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/corridors_walls_doors.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/debris_barriers_props.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/elevated_rails.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/elevators_shafts.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/facades_neon_colorways.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/factories_process.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/factories_smoke_orange.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/fortress_plazas.jpg",
       "kind": "citykit"
     },
     {
@@ -81,11 +121,23 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/industrial_heavy_crane.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/industrial_neon_plants.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/industrial_plant.jpg",
       "kind": "citykit"
     },
     {
       "file": "citykit/mansions_gothic_cyber.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/modular_angular_towers.jpg",
       "kind": "citykit"
     },
     {
@@ -97,11 +149,43 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/pipes_ducts_hubs.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/purple_forts_tunnels.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/road_markings.jpg",
       "kind": "citykit"
     },
     {
+      "file": "citykit/roads_cyber_fullset.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/roads_intersections_cobble.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/roads_junctions_simple.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/roofs_green_solar.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/roofs_hvac_industrial.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/roofs_hvac_solar.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/roofs_simple_grid.jpg",
       "kind": "citykit"
     },
     {
@@ -113,11 +197,43 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/shacks_slums_iso.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/shops_neon_jp_signs.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/shops_streetfront.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/storefront_facades_flat.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/street_atlas_modular.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/street_details_debris.jpg",
       "kind": "citykit"
     },
     {
+      "file": "citykit/towers_highrise_purple.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/towers_neon_jp_labels.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/towers_neon_variants.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/towers_purple_base.jpg",
       "kind": "citykit"
     },
     {
@@ -129,7 +245,15 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/trains_maglev_sets.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/truck_pickup_8dir.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/vehicles_armored.jpg",
       "kind": "citykit"
     },
     {

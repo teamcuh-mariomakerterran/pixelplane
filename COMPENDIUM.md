@@ -150,6 +150,10 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 
 ## 3. Changelog (newest first)
 
+### 2026-08-10 — Goodies wave 5 · City kit expansion
+- **+31 sheets (55 citykit total):** street shops, JP neon signs, armored vehicles, maglev trains, elevated rails, road sets/atlas, alleys, debris, civic temples, fortresses, factories, HVAC roofs, pipes, corridors, elevators
+- **Ctrl+K → city kit** dumps all 55
+
 ### 2026-08-10 — Goodies wave 4 · City kit
 - **24 magenta sheets:** neon/weaponized cars, 8-dir truck, trains/containers, road connectors, street debris, towers, gothic mansions, modular blocks, industrial plant, hangars/cranes, airport, rooftops, compounds
 - **Ctrl+K → city kit** (fast) · full goodies now wave 1–4

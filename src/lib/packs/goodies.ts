@@ -110,6 +110,38 @@ const LAYOUT_CITYKIT: Item[] = [
   { file: "citykit/roofs_hvac_solar.jpg", name: "City · HVAC & solar roofs", x: 680, y: 1480, max: 300 },
   { file: "citykit/airport_hangars.jpg", name: "City · airport & hangars", x: 1020, y: 1480, max: 300 },
   { file: "citykit/compounds_plazas.jpg", name: "City · compounds & plazas", x: 1360, y: 1480, max: 300 },
+  // —— wave 5 —— shops / signs / vehicles / roads / industry
+  { file: "citykit/shops_streetfront.jpg", name: "City · streetfront shops", x: 0, y: 1860, max: 300 },
+  { file: "citykit/shops_neon_jp_signs.jpg", name: "City · JP neon shop signs", x: 340, y: 1860, max: 280 },
+  { file: "citykit/towers_neon_jp_labels.jpg", name: "City · neon JP towers", x: 660, y: 1860, max: 280 },
+  { file: "citykit/storefront_facades_flat.jpg", name: "City · flat storefronts", x: 980, y: 1860, max: 280 },
+  { file: "citykit/shacks_slums_iso.jpg", name: "City · slum shacks", x: 1300, y: 1860, max: 280 },
+  { file: "citykit/vehicles_armored.jpg", name: "City · armored vehicles", x: 0, y: 2220, max: 300 },
+  { file: "citykit/trains_maglev_sets.jpg", name: "City · maglev trains", x: 340, y: 2220, max: 340 },
+  { file: "citykit/elevated_rails.jpg", name: "City · elevated rails", x: 720, y: 2220, max: 320 },
+  { file: "citykit/roads_cyber_fullset.jpg", name: "City · cyber road set", x: 1080, y: 2220, max: 340 },
+  { file: "citykit/roads_intersections_cobble.jpg", name: "City · cobble intersections", x: 0, y: 2600, max: 300 },
+  { file: "citykit/roads_junctions_simple.jpg", name: "City · simple junctions", x: 340, y: 2600, max: 280 },
+  { file: "citykit/street_atlas_modular.jpg", name: "City · modular street atlas", x: 660, y: 2600, max: 320 },
+  { file: "citykit/alleys_neon_graffiti.jpg", name: "City · neon alleys", x: 1020, y: 2600, max: 300 },
+  { file: "citykit/debris_barriers_props.jpg", name: "City · debris & barriers", x: 1360, y: 2600, max: 280 },
+  { file: "citykit/modular_angular_towers.jpg", name: "City · angular modular", x: 0, y: 2960, max: 300 },
+  { file: "citykit/towers_highrise_purple.jpg", name: "City · purple highrise", x: 340, y: 2960, max: 300 },
+  { file: "citykit/towers_purple_base.jpg", name: "City · purple base towers", x: 680, y: 2960, max: 300 },
+  { file: "citykit/civic_temples_topdown.jpg", name: "City · civic temples", x: 1020, y: 2960, max: 300 },
+  { file: "citykit/fortress_plazas.jpg", name: "City · fortress plazas", x: 1360, y: 2960, max: 300 },
+  { file: "citykit/castles_dark_fort.jpg", name: "City · dark castles", x: 0, y: 3320, max: 300 },
+  { file: "citykit/purple_forts_tunnels.jpg", name: "City · purple forts/tunnels", x: 340, y: 3320, max: 300 },
+  { file: "citykit/factories_process.jpg", name: "City · process factories", x: 680, y: 3320, max: 300 },
+  { file: "citykit/factories_smoke_orange.jpg", name: "City · smoke factories", x: 1020, y: 3320, max: 300 },
+  { file: "citykit/industrial_heavy_crane.jpg", name: "City · heavy industrial", x: 1360, y: 3320, max: 300 },
+  { file: "citykit/industrial_neon_plants.jpg", name: "City · neon plants", x: 0, y: 3680, max: 300 },
+  { file: "citykit/roofs_green_solar.jpg", name: "City · green/solar roofs", x: 340, y: 3680, max: 300 },
+  { file: "citykit/roofs_hvac_industrial.jpg", name: "City · industrial HVAC roofs", x: 680, y: 3680, max: 300 },
+  { file: "citykit/roofs_simple_grid.jpg", name: "City · simple grid roofs", x: 1020, y: 3680, max: 280 },
+  { file: "citykit/pipes_ducts_hubs.jpg", name: "City · pipes & duct hubs", x: 1340, y: 3680, max: 300 },
+  { file: "citykit/corridors_walls_doors.jpg", name: "City · corridors & walls", x: 0, y: 4040, max: 340 },
+  { file: "citykit/elevators_shafts.jpg", name: "City · elevator shafts", x: 380, y: 4040, max: 240 },
 ];
 
 async function loadImage(url: string): Promise<HTMLImageElement> {
@@ -170,11 +202,11 @@ export async function summonGoodiesDrop(): Promise<number> {
   const placed = a + b + c;
 
   if (placed) {
-    studio.createWireZone(ox - 40, oy - 40, 1900, 5400, "environments");
+    studio.createWireZone(ox - 40, oy - 40, 1900, 9800, "environments");
     const zones = useStudio.getState().wireZones;
     const last = zones[zones.length - 1];
-    if (last) studio.renameWireZone(last.id, "Goodies · Night Ops (wave 1–4)");
-    studio.setStatus(`Goodies Drop · ${placed} boards · citykit + skyline + arsenal`);
+    if (last) studio.renameWireZone(last.id, "Goodies · Night Ops (wave 1–5)");
+    studio.setStatus(`Goodies Drop · ${placed} boards · citykit 55 + skyline + arsenal`);
     studio.setCamera({ x: -ox * z + 40, y: -oy * z + 40, zoom: Math.min(0.22, z) });
     stampTimeline("Goodies wave 1–4", `${placed} boards`);
   } else {
@@ -214,11 +246,11 @@ export async function summonCityKit(): Promise<number> {
 
   const placed = await placeLayout(LAYOUT_CITYKIT, ox, oy);
   if (placed) {
-    studio.createWireZone(ox - 40, oy - 40, 1850, 1900, "environments");
+    studio.createWireZone(ox - 40, oy - 40, 1850, 4400, "environments");
     const zones = useStudio.getState().wireZones;
     const last = zones[zones.length - 1];
-    if (last) studio.renameWireZone(last.id, "City kit · vehicles · roads · modular");
-    studio.setStatus(`City kit · ${placed} sheets (cars, rails, towers, roofs)`);
+    if (last) studio.renameWireZone(last.id, "City kit · vehicles · roads · modular · shops");
+    studio.setStatus(`City kit · ${placed} sheets (cars, rails, neon shops, industry)`);
     studio.setCamera({ x: -ox * z + 40, y: -oy * z + 40, zoom: Math.min(0.35, z) });
     stampTimeline("City kit", `${placed} sheets`);
   }

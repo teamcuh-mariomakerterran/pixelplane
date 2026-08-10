@@ -144,7 +144,7 @@ export function CommandPalette() {
         id: "goodies",
         group: "Signature",
         label: "Summon Goodies Drop",
-        hint: "wave 1–4 · arsenal · brew · skyline · city",
+        hint: "wave 1–5 · arsenal · brew · skyline · city",
         keywords: "goodies gear weapons roads ui buildings inventory skyline city",
         run: () => {
           void summonGoodiesDrop().then((n) => {
@@ -168,7 +168,7 @@ export function CommandPalette() {
         id: "citykit",
         group: "Signature",
         label: "Summon City kit only",
-        hint: "24 sheets · cars · rails · modular",
+        hint: "55 sheets · cars · neon shops · rails · modular",
         keywords: "city kit cars vehicles roads trains towers industrial modular hangars",
         run: () => {
           void summonCityKit().then((n) => {
