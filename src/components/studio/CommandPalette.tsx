@@ -140,9 +140,10 @@ export function CommandPalette() {
         keywords: "hero player sprite engine",
         run: () => {
           const s = useSignature.getState();
-          s.setNightHeroInEngine(!s.nightHeroInEngine);
+          const next = !s.nightHeroInEngine;
+          s.setNightHeroInEngine(next);
           useStudio.getState().setStatus(
-            !s.nightHeroInEngine
+            next
               ? "Night District hero ON in City Engine"
               : "Night District hero OFF · amber dot player",
           );
