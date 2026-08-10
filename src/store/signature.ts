@@ -8,6 +8,7 @@ import { useStudio } from "@/store/studio";
 import { compositeLayers } from "@/lib/pixel/buffer";
 import { applyRail, RAILS, diffMask } from "@/lib/pixel/mutation-rails";
 import { uid } from "@/lib/utils";
+import { stampTimeline } from "@/store/timeline";
 
 export type OrbitPin = {
   boardId: string;
@@ -139,6 +140,7 @@ export const useSignature = create<SignatureState>((set, get) => ({
     s.setStatus(
       `Diff lantern · ${mask.changed} px differ · ${a.name} ↔ ${b.name}`,
     );
+    stampTimeline("Diff lantern", `${mask.changed} Δ`);
   },
 
   clearDiff: () => set({ diffResult: null, diffEnabled: false }),
@@ -173,6 +175,7 @@ export const useSignature = create<SignatureState>((set, get) => ({
     }
     set({ orbitPins: pins.slice(-6), orbitEnabled: true });
     s.setStatus(`Mutation rails · ${RAILS.length} variants from ${board.name}`);
+    stampTimeline("Mutation rails", board.name);
   },
 
   setNightHeroInEngine: (nightHeroInEngine) => set({ nightHeroInEngine }),

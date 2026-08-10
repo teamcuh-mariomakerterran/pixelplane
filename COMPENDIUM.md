@@ -150,6 +150,13 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 
 ## 3. Changelog (newest first)
 
+### 2026-08-10 — Holy Shit Layer III (Wave C · time / kernels / sound)
+- **Goodies Drop pack:** weapons/armor, fish/tech, road grids, neon tiles, buildings, UI HUD, props, solitaire chrome → `/public/packs/goodies`
+- **Summon Goodies** (Ctrl+K) dumps boards + Night Ops feed plane
+- **Living timeline:** stamp + auto-stamp moments; scrub camera; strip UI
+- **Play kernels:** Inventory (12 slots) + Active Leads checklist (UI from drop)
+- **Sound-as-sprite:** chips on plane, click to play Web Audio patterns (blip/bass/noise/chord/siren)
+
 ### 2026-08-10 — Holy Shit Layer II (Wave B production magic)
 - **Reference Orbit:** pin boards → cyan satellite cards orbit the view with tethers
 - **Diff Lantern:** compare active board vs nearest neighbor; hot amber Δ pixels
@@ -505,6 +512,7 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 Brian’s directive (2026-08-01): **do not pick only a few** — implement the full set so PixelPlane owns a category.
 
 ### 6.1 Living collage timeline
+- **Status:** Shipped lite (Layer III) — moments strip + camera jump
 - **Idea:** Horizontal beat line on plane; X = time; anims/actors/particles/parallax scrub in sync.
 - **Data:** `TimelineRail { id, y, startX, endX, bpm?, durationMs }` + links from actors/anims.
 - **UI:** Tool or icon drop; scrub head; play.

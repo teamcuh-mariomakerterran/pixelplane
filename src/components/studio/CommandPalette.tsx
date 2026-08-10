@@ -11,6 +11,11 @@ import { useSignature } from "@/store/signature";
 import { TOOL_LABELS } from "@/lib/hotkeys/defaults";
 import type { ToolId } from "@/lib/pixel/types";
 import { summonNightDistrict } from "@/lib/packs/night-district";
+import { summonGoodiesDrop } from "@/lib/packs/goodies";
+import { stampTimeline } from "@/store/timeline";
+import { useKernels } from "@/store/kernels";
+import { useSoundSprites } from "@/store/sound-sprites";
+import { useTimeline } from "@/store/timeline";
 import { pickSnapshot, saveSnapshot } from "@/lib/pixel/persist";
 import { Keyboard } from "lucide-react";
 
@@ -68,7 +73,9 @@ export function CommandPalette() {
         hint: "cyberpunk pack",
         keywords: "night district cyberpunk pack summon city",
         run: () => {
-          void summonNightDistrict();
+          void summonNightDistrict().then((n) => {
+            if (n) stampTimeline("Night District", `${n} boards`);
+          });
         },
       },
       {
@@ -132,6 +139,58 @@ export function CommandPalette() {
         label: "Mutation rails (4 variants)",
         keywords: "mutation rails neon dusk chrome",
         run: () => useSignature.getState().spawnMutationRails(),
+      },
+      {
+        id: "goodies",
+        group: "Signature",
+        label: "Summon Goodies Drop",
+        hint: "weapons · tiles · UI · buildings",
+        keywords: "goodies gear weapons roads ui buildings inventory",
+        run: () => {
+          void summonGoodiesDrop().then((n) => {
+            if (n) stampTimeline("Goodies Drop", `${n} boards`);
+          });
+        },
+      },
+      {
+        id: "inventory",
+        group: "Signature",
+        label: "Open Inventory kernel",
+        keywords: "inventory kernel play gear",
+        run: () => {
+          useKernels.getState().placeInventory();
+          stampTimeline("Inventory kernel");
+        },
+      },
+      {
+        id: "leads",
+        group: "Signature",
+        label: "Open Active Leads kernel",
+        keywords: "leads quest checklist kernel",
+        run: () => {
+          useKernels.getState().placeLeads();
+          stampTimeline("Leads kernel");
+        },
+      },
+      {
+        id: "sfx",
+        group: "Signature",
+        label: "Drop sound sprite at view center",
+        keywords: "sound sprite audio chip sfx",
+        run: () => {
+          const cam = useStudio.getState().camera;
+          const wx = (400 - cam.x) / (cam.zoom || 1);
+          const wy = (300 - cam.y) / (cam.zoom || 1);
+          useSoundSprites.getState().place(wx, wy);
+          stampTimeline("Sound sprite");
+        },
+      },
+      {
+        id: "timeline",
+        group: "Signature",
+        label: "Stamp timeline moment",
+        keywords: "timeline living collage stamp",
+        run: () => useTimeline.getState().stamp("Manual mark"),
       },
       {
         id: "nighthero",
@@ -250,11 +309,22 @@ export function CommandPalette() {
   const filtered = useMemo(() => {
     const needle = q.trim().toLowerCase();
     if (!needle) return entries;
-    return entries.filter((e) =>
-      `${e.label} ${e.hint ?? ""} ${e.keywords ?? ""} ${e.group}`
-        .toLowerCase()
-        .includes(needle),
-    );
+    const scored = entries
+      .map((e) => {
+        const label = e.label.toLowerCase();
+        const blob = `${e.label} ${e.hint ?? ""} ${e.keywords ?? ""} ${e.group}`.toLowerCase();
+        if (!blob.includes(needle)) return null;
+        let score = 0;
+        if (label === needle) score = 100;
+        else if (label.startsWith(needle)) score = 80;
+        else if (label.includes(needle)) score = 60;
+        else if ((e.keywords ?? "").toLowerCase().includes(needle)) score = 40;
+        else score = 10;
+        return { e, score };
+      })
+      .filter(Boolean) as { e: Entry; score: number }[];
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((x) => x.e);
   }, [entries, q]);
 
   useEffect(() => {

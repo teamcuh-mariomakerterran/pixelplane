@@ -13,6 +13,7 @@ import { useCharacterDistrict } from "@/store/character-district";
 import { useCollab } from "@/store/collab";
 import { useMemoryWeb } from "@/store/memory-web";
 import { useSignature } from "@/store/signature";
+import { useSoundSprites } from "@/store/sound-sprites";
 import { compositeLayers, bufferToImageData } from "@/lib/pixel/buffer";
 import { wireZoneHeat, worldCenterFromCamera } from "@/lib/spatial/wave-a";
 import { zoneWorld, padWorld } from "@/lib/character-district/layout";
@@ -919,6 +920,41 @@ export function CanvasWorkspace() {
         ctx.setLineDash([]);
       }
 
+      // Sound-as-sprite chips (world)
+      {
+        const sfx = useSoundSprites.getState();
+        if (sfx.show) {
+          for (const c of sfx.chips) {
+            const sx = c.x;
+            const sy = c.y;
+            const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 200 + c.x);
+            ctx.fillStyle = `rgba(192,132,252,${0.35 + pulse * 0.25})`;
+            ctx.beginPath();
+            ctx.arc(sx, sy, 14 / cam.zoom, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "rgba(232,168,56,0.9)";
+            ctx.lineWidth = 1.5 / cam.zoom;
+            ctx.stroke();
+            // waveform ticks
+            ctx.strokeStyle = "rgba(62,207,207,0.85)";
+            ctx.beginPath();
+            for (let i = -6; i <= 6; i++) {
+              const h = (4 + Math.abs(Math.sin(performance.now() / 120 + i + c.y)) * 8) / cam.zoom;
+              ctx.moveTo(sx + (i * 2) / cam.zoom, sy - h / 2);
+              ctx.lineTo(sx + (i * 2) / cam.zoom, sy + h / 2);
+            }
+            ctx.stroke();
+            labels.push({
+              text: c.name,
+              x: cam.x + sx * cam.zoom + 10,
+              y: cam.y + sy * cam.zoom - 8,
+              color: "#e9d5ff",
+              bg: "rgba(40,20,60,0.75)",
+            });
+          }
+        }
+      }
+
       ctx.restore();
 
       // Screen-space labels
@@ -1092,6 +1128,19 @@ export function CanvasWorkspace() {
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
     const { x: wx, y: wy } = screenToWorld(sx, sy);
+    // Sound chips first
+    {
+      const sfx = useSoundSprites.getState();
+      for (let i = sfx.chips.length - 1; i >= 0; i--) {
+        const c = sfx.chips[i];
+        if (Math.hypot(wx - c.x, wy - c.y) < 18) {
+          sfx.play(c.id);
+          sfx.select(c.id);
+          useStudio.getState().setStatus(`Playing ${c.name}`);
+          return;
+        }
+      }
+    }
     const state = useStudio.getState();
     const plane = usePlaneSystems.getState();
     const tool = state.spacePan || e.button === 1 || e.button === 2 ? "pan" : state.tool;

@@ -1,0 +1,92 @@
+{
+  "id": "goodies-drop",
+  "name": "Goodies Drop \u2014 Night Ops",
+  "version": 1,
+  "description": "Weapons/armor, creatures, road tiles, cyber UI, buildings, props, solitaire chrome",
+  "assets": [
+    {
+      "file": "buildings/jxi1x.jpg",
+      "kind": "buildings"
+    },
+    {
+      "file": "buildings/mOZOE.jpg",
+      "kind": "buildings"
+    },
+    {
+      "file": "buildings/nMCsy.jpg",
+      "kind": "buildings"
+    },
+    {
+      "file": "buildings/nUpcQ.jpg",
+      "kind": "buildings"
+    },
+    {
+      "file": "buildings/wMqaj.jpg",
+      "kind": "buildings"
+    },
+    {
+      "file": "creatures/fish_and_tech.png",
+      "kind": "creatures"
+    },
+    {
+      "file": "gear/inventory_weapons_armor.png",
+      "kind": "gear"
+    },
+    {
+      "file": "props/office_desks_servers.png",
+      "kind": "props"
+    },
+    {
+      "file": "props/shelf_emptyish.png",
+      "kind": "props"
+    },
+    {
+      "file": "props/shelf_full.png",
+      "kind": "props"
+    },
+    {
+      "file": "roads/city_road_grid.png",
+      "kind": "roads"
+    },
+    {
+      "file": "solitaire/win_loss_counter.png",
+      "kind": "solitaire"
+    },
+    {
+      "file": "tiles/cyber_roads_magenta.png",
+      "kind": "tiles"
+    },
+    {
+      "file": "ui/active_leads.png",
+      "kind": "ui"
+    },
+    {
+      "file": "ui/buttons_cyan_pink.png",
+      "kind": "ui"
+    },
+    {
+      "file": "ui/buttons_variants.png",
+      "kind": "ui"
+    },
+    {
+      "file": "ui/city_grid_map.png",
+      "kind": "ui"
+    },
+    {
+      "file": "ui/integrity_bar.png",
+      "kind": "ui"
+    },
+    {
+      "file": "ui/integrity_energy_bars.png",
+      "kind": "ui"
+    },
+    {
+      "file": "ui/pause_menu.png",
+      "kind": "ui"
+    },
+    {
+      "file": "ui/system_paused.png",
+      "kind": "ui"
+    }
+  ]
+}
