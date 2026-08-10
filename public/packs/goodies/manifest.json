@@ -1,8 +1,8 @@
 {
   "id": "goodies-drop",
   "name": "Goodies Drop \u2014 Night Ops",
-  "version": 7,
-  "description": "Wave1-7: gear, skyline, citykit (115 sheets), props, brew",
+  "version": 8,
+  "description": "Wave1-8: gear, skyline, citykit (139 sheets), props, brew",
   "assets": [
     {
       "file": "buildings/industrial_hangar_ship.jpg",
@@ -45,11 +45,27 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/airport_hangars_tower.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/alleys_neon_graffiti.jpg",
       "kind": "citykit"
     },
     {
+      "file": "citykit/alleys_neon_street.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/apartments_block_roofs.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/apartments_lit_windows.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/apartments_purple_neon.jpg",
       "kind": "citykit"
     },
     {
@@ -65,11 +81,19 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/buildings_grey_mass.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/buildings_industrial_front.jpg",
       "kind": "citykit"
     },
     {
       "file": "citykit/buildings_neon_fronts.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/buildings_temple_dark.jpg",
       "kind": "citykit"
     },
     {
@@ -109,6 +133,10 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/cranes_gantry_detail.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/cranes_gantry_sheds.jpg",
       "kind": "citykit"
     },
@@ -137,7 +165,15 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/factories_color_plants.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/factories_heavy.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/factories_pipe_maze.jpg",
       "kind": "citykit"
     },
     {
@@ -150,6 +186,10 @@
     },
     {
       "file": "citykit/floors_pipe_platforms.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/fortress_industrial_dark.jpg",
       "kind": "citykit"
     },
     {
@@ -170,6 +210,10 @@
     },
     {
       "file": "citykit/hangars_cranes.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/hangars_warehouse_front.jpg",
       "kind": "citykit"
     },
     {
@@ -225,6 +269,10 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/modular_base_shapes.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/modular_blocks_low.jpg",
       "kind": "citykit"
     },
@@ -242,6 +290,10 @@
     },
     {
       "file": "citykit/modular_purple_tubes.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/modules_hangar_tower.jpg",
       "kind": "citykit"
     },
     {
@@ -282,6 +334,10 @@
     },
     {
       "file": "citykit/roads_cyber_fullset.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/roads_elevated_highway.jpg",
       "kind": "citykit"
     },
     {
@@ -381,6 +437,14 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/storefronts_neon_signs.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/stores_big_box.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/street_atlas_modular.jpg",
       "kind": "citykit"
     },
@@ -410,6 +474,10 @@
     },
     {
       "file": "citykit/towers_neon_skyscraper.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/towers_neon_tech.jpg",
       "kind": "citykit"
     },
     {
@@ -449,7 +517,15 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/vehicles_armed_color.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/vehicles_armed_cyber.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/vehicles_armed_dark.jpg",
       "kind": "citykit"
     },
     {
@@ -461,11 +537,23 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/vehicles_blue_pickup.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/vehicles_bus_damage.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/vehicles_civilian_fleet.jpg",
       "kind": "citykit"
     },
     {
       "file": "citykit/vehicles_color_fleet.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/vehicles_cyber_trucks.jpg",
       "kind": "citykit"
     },
     {
@@ -478,6 +566,10 @@
     },
     {
       "file": "citykit/vehicles_motorcycles.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/vehicles_police_fleet.jpg",
       "kind": "citykit"
     },
     {
@@ -494,6 +586,10 @@
     },
     {
       "file": "citykit/vehicles_taxi_damage.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/vehicles_van_damage.jpg",
       "kind": "citykit"
     },
     {

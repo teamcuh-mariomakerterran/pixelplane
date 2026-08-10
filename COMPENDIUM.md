@@ -150,6 +150,10 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 
 ## 3. Changelog (newest first)
 
+### 2026-08-10 — Goodies wave 8 · Highways · neon shops · police · buses
+- **+24 sheets (139 citykit total):** elevated highway kit, neon storefronts (hotel/bar/cyberdeck/club), police fleet damage, bus clean→burned, van damage, cyber trucks, armed color/dark cars, purple neon apts, neon alleys, color industrial plants, big-box stores, airport hangars, dark fortresses, modular base shapes
+- **Ctrl+K → city kit** dumps all 139
+
 ### 2026-08-10 — Goodies wave 7 · EMS · bikes · factories · interiors
 - **+34 sheets (115 citykit total):** motorcycles (clean→wreck), EMS fleet + damage, sports/color cars, taxi damage, heavy factories, living-room interiors, mega fortresses, dense cyber facades, server rooms, purple modular pipes, rail+crane kit, garden helipads
 - **Ctrl+K → city kit** dumps all 115
