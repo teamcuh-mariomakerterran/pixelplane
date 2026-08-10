@@ -299,6 +299,33 @@ export function CommandPalette() {
         },
       },
       {
+        id: "frameboard",
+        group: "Camera ghosts",
+        label: "Frame active board",
+        keywords: "frame focus fit artboard camera",
+        run: () => {
+          const s = useStudio.getState();
+          const b = s.artboards.find((x) => x.id === s.activeArtboardId);
+          if (!b) {
+            s.setStatus("Select a board to frame");
+            return;
+          }
+          const pad = 80;
+          const vw = typeof window !== "undefined" ? window.innerWidth - 320 : 1000;
+          const vh = typeof window !== "undefined" ? window.innerHeight - 120 : 700;
+          const zoom = Math.min(
+            8,
+            Math.max(0.08, Math.min((vw - pad) / b.width, (vh - pad) / b.height) * 0.9),
+          );
+          s.setCamera({
+            zoom,
+            x: vw / 2 - (b.x + b.width / 2) * zoom,
+            y: vh / 2 - (b.y + b.height / 2) * zoom,
+          });
+          s.setStatus(`Framed · ${b.name}`);
+        },
+      },
+      {
         id: "engine",
         group: "Suite",
         label: "Enter City Engine",

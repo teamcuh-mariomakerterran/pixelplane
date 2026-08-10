@@ -1,5 +1,5 @@
 import { useTimeline } from "@/store/timeline";
-import { Clock, X, Camera } from "lucide-react";
+import { Clock, X, Camera, Play, Square } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Living collage timeline — scrub moments along the bottom. */
@@ -7,10 +7,13 @@ export function TimelineStrip() {
   const moments = useTimeline((s) => s.moments);
   const activeId = useTimeline((s) => s.activeId);
   const show = useTimeline((s) => s.showStrip);
+  const playing = useTimeline((s) => s.playing);
   const jump = useTimeline((s) => s.jump);
   const remove = useTimeline((s) => s.remove);
   const setShow = useTimeline((s) => s.setShowStrip);
   const stamp = useTimeline((s) => s.stamp);
+  const playThrough = useTimeline((s) => s.playThrough);
+  const stopPlay = useTimeline((s) => s.stopPlay);
 
   if (!show) {
     return (
@@ -35,6 +38,15 @@ export function TimelineStrip() {
         <span className="text-subtle">{moments.length} moments</span>
         <button
           type="button"
+          className="inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-muted hover:text-fg"
+          onClick={() => (playing ? stopPlay() : playThrough())}
+          title="Play camera path through moments"
+        >
+          {playing ? <Square size={10} /> : <Play size={10} />}
+          {playing ? "Stop" : "Play"}
+        </button>
+        <button
+          type="button"
           className="ml-auto inline-flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-muted hover:text-fg"
           onClick={() => stamp("Manual mark", "User stamp")}
         >
@@ -52,7 +64,7 @@ export function TimelineStrip() {
       <div className="flex items-stretch gap-1 overflow-x-auto rounded-b-lg border border-border/80 bg-bg-elevated/90 p-1.5 shadow-xl backdrop-blur-md">
         {moments.length === 0 && (
           <div className="px-3 py-2 text-[10px] text-subtle">
-            Moments auto-stamp on big moves · or hit Stamp
+            Moments auto-stamp on big moves · or hit Stamp · Play flies the camera
           </div>
         )}
         {moments.map((m, i) => (
@@ -69,6 +81,7 @@ export function TimelineStrip() {
               activeId === m.id
                 ? "border-accent/60 bg-accent/15"
                 : "border-border/70 bg-surface/80 hover:border-border-strong",
+              playing && activeId === m.id && "ring-1 ring-cyan-400/60",
             )}
             style={{ boxShadow: `inset 3px 0 0 ${m.color}` }}
             title={`${m.label} · right-click remove`}

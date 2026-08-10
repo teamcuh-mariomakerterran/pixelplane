@@ -348,6 +348,24 @@ export function CityEngineView() {
         ctx.scale(z, z);
         ctx.imageSmoothingEnabled = false;
         ctx.drawImage(mapImg.current, 0, 0, s.outdoorW, s.outdoorH);
+        // day/night color grade
+        const phase = s.dayPhase;
+        // 0 dawn · 0.25 day · 0.5 dusk · 0.75 night
+        let tint = "rgba(0,0,0,0)";
+        if (phase > 0.55 && phase < 0.95) {
+          // night cyan/purple
+          const n = phase < 0.75 ? (phase - 0.55) / 0.2 : (0.95 - phase) / 0.2;
+          tint = `rgba(20,10,50,${0.12 + n * 0.28})`;
+        } else if (phase > 0.4 && phase < 0.55) {
+          const n = (phase - 0.4) / 0.15;
+          tint = `rgba(180,60,40,${n * 0.18})`;
+        } else if (phase < 0.12 || phase > 0.95) {
+          tint = "rgba(255,160,80,0.1)";
+        }
+        if (tint !== "rgba(0,0,0,0)") {
+          ctx.fillStyle = tint;
+          ctx.fillRect(0, 0, s.outdoorW, s.outdoorH);
+        }
         ctx.restore();
       } else if (s.realm === "indoor" && s.indoorBake) {
         const img = new ImageData(
@@ -479,6 +497,32 @@ export function CityEngineView() {
             ctx.font = "9px sans-serif";
             const short = n.label.length > 36 ? n.label.slice(0, 34) + "…" : n.label;
             ctx.fillText(short, nx + 10, ny + 10);
+          }
+        }
+
+        // foot dust
+        for (const d of s.dust) {
+          const a = Math.max(0, d.life / 0.6);
+          ctx.fillStyle = `rgba(200,190,160,${a * 0.45})`;
+          ctx.beginPath();
+          ctx.arc(ox + d.x * z, oy + d.y * z, (2 + a * 2) * z * 0.4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // interaction rings (enter / smash)
+        {
+          const px = ox + s.player.x * z;
+          const py = oy + s.player.y * z;
+          if (s.player.mode === "foot") {
+            ctx.strokeStyle = "rgba(232,168,56,0.2)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(px, py, ENGINE.enterRadius * z, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.strokeStyle = "rgba(249,115,22,0.18)";
+            ctx.beginPath();
+            ctx.arc(px, py, 72 * z, 0, Math.PI * 2);
+            ctx.stroke();
           }
         }
       }

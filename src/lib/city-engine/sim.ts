@@ -127,6 +127,10 @@ export type EngineState = {
   ruleSpeedMult: number;
   /** camera shake remaining (seconds) */
   shake: number;
+  /** Layer IV+ foot dust particles */
+  dust: { x: number; y: number; life: number; vx: number; vy: number }[];
+  /** ambient day phase 0–1 */
+  dayPhase: number;
 };
 
 export function createEngineState(
@@ -180,6 +184,8 @@ export function createEngineState(
     ruleCd: createCooldowns(),
     ruleSpeedMult: 1,
     shake: 0,
+    dust: [],
+    dayPhase: 0.35,
   };
 }
 
@@ -501,6 +507,17 @@ export function step(s: EngineState, dt: number) {
   if (s.smashFlash > 0) s.smashFlash = Math.max(0, s.smashFlash - dt);
   if (s.shake > 0) s.shake = Math.max(0, s.shake - dt);
   s.props = tickProps(s.props, dt);
+  // ambient day/night cycle ~90s full day
+  s.dayPhase = (s.dayPhase + dt / 90) % 1;
+  // dust age
+  s.dust = s.dust
+    .map((d) => ({
+      ...d,
+      life: d.life - dt,
+      x: d.x + d.vx * dt,
+      y: d.y + d.vy * dt,
+    }))
+    .filter((d) => d.life > 0);
 
   {
     const cards = getRuleCards();
@@ -581,6 +598,17 @@ export function step(s: EngineState, dt: number) {
         p.y += dy;
       }
       p.rot = Math.atan2(my, mx);
+      // foot dust
+      if (Math.random() < 0.35) {
+        s.dust.push({
+          x: p.x + (Math.random() - 0.5) * 8,
+          y: p.y + (Math.random() - 0.5) * 8,
+          life: 0.35 + Math.random() * 0.25,
+          vx: -mx * 12 + (Math.random() - 0.5) * 20,
+          vy: -my * 12 + (Math.random() - 0.5) * 20,
+        });
+        if (s.dust.length > 80) s.dust.splice(0, s.dust.length - 80);
+      }
     }
     s.underOverhang = s.footings.some((f) => actorUnderOverhang(p.x, p.y, f));
     const veh = nearestVehicle(s);
