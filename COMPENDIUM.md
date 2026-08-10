@@ -150,6 +150,11 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 
 ## 3. Changelog (newest first)
 
+### 2026-08-10 — Goodies wave 2 + Brew kernel
+- **+24 assets:** office furniture, landmarks/metro, hangars, named street shops, ports, heavy weapon sheets, quest tools/gadgets, scavenge loot, full bar/cook/brew district art
+- **Brew kernel:** heat/cool/pour minigame (sweet spot 55–72°) skinned from bar drop
+- **Summon Goodies** now dumps wave 1+2 (~45 boards) into one Night Ops feed
+
 ### 2026-08-10 — Holy Shit Layer III (Wave C · time / kernels / sound)
 - **Goodies Drop pack:** weapons/armor, fish/tech, road grids, neon tiles, buildings, UI HUD, props, solitaire chrome → `/public/packs/goodies`
 - **Summon Goodies** (Ctrl+K) dumps boards + Night Ops feed plane

@@ -1,11 +1,19 @@
 {
   "id": "goodies-drop",
   "name": "Goodies Drop \u2014 Night Ops",
-  "version": 1,
-  "description": "Weapons/armor, creatures, road tiles, cyber UI, buildings, props, solitaire chrome",
+  "version": 2,
+  "description": "Wave1+2: gear, buildings, office props, quest items, brew/cook drinks, UI",
   "assets": [
     {
+      "file": "buildings/industrial_hangar_ship.jpg",
+      "kind": "buildings"
+    },
+    {
       "file": "buildings/jxi1x.jpg",
+      "kind": "buildings"
+    },
+    {
+      "file": "buildings/landmarks_metro_crane.jpg",
       "kind": "buildings"
     },
     {
@@ -21,6 +29,14 @@
       "kind": "buildings"
     },
     {
+      "file": "buildings/ports_cargo_power.jpg",
+      "kind": "buildings"
+    },
+    {
+      "file": "buildings/street_shops_named.jpg",
+      "kind": "buildings"
+    },
+    {
       "file": "buildings/wMqaj.jpg",
       "kind": "buildings"
     },
@@ -29,8 +45,88 @@
       "kind": "creatures"
     },
     {
+      "file": "drinks/bladerunner_menu.jpg",
+      "kind": "drinks"
+    },
+    {
+      "file": "drinks/brewing_ui.jpg",
+      "kind": "drinks"
+    },
+    {
+      "file": "drinks/cocktails_menu_a.jpg",
+      "kind": "drinks"
+    },
+    {
+      "file": "drinks/cooking_profession.jpg",
+      "kind": "drinks"
+    },
+    {
+      "file": "drinks/cooking_ui_icons.jpg",
+      "kind": "drinks"
+    },
+    {
+      "file": "drinks/distill_ingredients.jpg",
+      "kind": "drinks"
+    },
+    {
+      "file": "drinks/named_pours.jpg",
+      "kind": "drinks"
+    },
+    {
+      "file": "drinks/potion_bottles.jpg",
+      "kind": "drinks"
+    },
+    {
+      "file": "drinks/sauces_hot.jpg",
+      "kind": "drinks"
+    },
+    {
+      "file": "drinks/shots_fx.jpg",
+      "kind": "drinks"
+    },
+    {
+      "file": "fx/hp_bar_strip.png",
+      "kind": "fx"
+    },
+    {
       "file": "gear/inventory_weapons_armor.png",
       "kind": "gear"
+    },
+    {
+      "file": "gear/weapons_blue_magic.png",
+      "kind": "gear"
+    },
+    {
+      "file": "gear/weapons_cyan_heavy.png",
+      "kind": "gear"
+    },
+    {
+      "file": "gear/weapons_rifles_gadgets.png",
+      "kind": "gear"
+    },
+    {
+      "file": "items/quest_gadgets_named.jpg",
+      "kind": "items"
+    },
+    {
+      "file": "items/quest_icons_utility.jpg",
+      "kind": "items"
+    },
+    {
+      "file": "items/quest_tools_1_8.jpg",
+      "kind": "items"
+    },
+    {
+      "file": "items/scavenge_loot.jpg",
+      "kind": "items"
+    },
+    {
+      "file": "items/smokes_packs.jpg",
+      "kind": "items"
+    },
+    {
+      "file": "props/cyber_office_furniture.png",
+      "kind": "props"
     },
     {
       "file": "props/office_desks_servers.png",

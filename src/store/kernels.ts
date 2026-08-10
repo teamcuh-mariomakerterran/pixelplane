@@ -7,7 +7,7 @@ import { create } from "zustand";
 import { uid } from "@/lib/utils";
 import { useStudio } from "@/store/studio";
 
-export type KernelKind = "inventory" | "leads";
+export type KernelKind = "inventory" | "leads" | "brew";
 
 export type InventorySlot = {
   id: string;
@@ -35,6 +35,14 @@ export type KernelInstance = {
   selectedSlot?: string | null;
   // leads
   leads?: LeadItem[];
+  // brew mini
+  brew?: {
+    recipe: string;
+    heat: number;
+    pour: number;
+    quality: "raw" | "ok" | "perfect" | "burned";
+    lastDrink: string | null;
+  };
 };
 
 type KernelState = {
@@ -43,6 +51,9 @@ type KernelState = {
 
   placeInventory: () => string;
   placeLeads: () => string;
+  placeBrew: () => string;
+  heatBrew: (id: string, delta: number) => void;
+  pourBrew: (id: string) => void;
   select: (id: string | null) => void;
   setMinimized: (id: string, v: boolean) => void;
   remove: (id: string) => void;
@@ -150,6 +161,75 @@ export const useKernels = create<KernelState>((set, get) => ({
     useStudio.getState().setStatus("Leads kernel · mission checklist");
     return id;
   },
+  placeBrew: () => {
+    const id = uid("ker");
+    const recipes = [
+      "Impossible Sober Cocktail",
+      "Neon Zest Cooler",
+      "Blade Grid Lager",
+      "Cyan Bolt",
+      "Magenta Flash",
+      "Aged Eclipse",
+    ];
+    const inst: KernelInstance = {
+      id,
+      kind: "brew",
+      name: "Brew kernel",
+      x: 0,
+      y: 0,
+      minimized: false,
+      brew: {
+        recipe: recipes[Math.floor(Math.random() * recipes.length)]!,
+        heat: 40,
+        pour: 0,
+        quality: "raw",
+        lastDrink: null,
+      },
+    };
+    set((s) => ({ instances: [...s.instances, inst], activeId: id }));
+    useStudio.getState().setStatus("Brew kernel · pour minigame from bar art");
+    return id;
+  },
+
+  heatBrew: (id, delta) =>
+    set((s) => ({
+      instances: s.instances.map((k) => {
+        if (k.id !== id || !k.brew) return k;
+        const heat = Math.max(0, Math.min(100, k.brew.heat + delta));
+        return { ...k, brew: { ...k.brew, heat, quality: "raw" as const } };
+      }),
+    })),
+
+  pourBrew: (id) =>
+    set((s) => ({
+      instances: s.instances.map((k) => {
+        if (k.id !== id || !k.brew) return k;
+        const heat = k.brew.heat;
+        let quality: "raw" | "ok" | "perfect" | "burned" = "ok";
+        if (heat >= 55 && heat <= 72) quality = "perfect";
+        else if (heat > 85) quality = "burned";
+        else if (heat < 30) quality = "raw";
+        const pour = Math.min(100, k.brew.pour + 20);
+        useStudio
+          .getState()
+          .setStatus(
+            quality === "perfect"
+              ? `Perfect pour · ${k.brew.recipe}`
+              : quality === "burned"
+                ? `Burned · cool the still`
+                : `Poured ${k.brew.recipe} · ${quality}`,
+          );
+        return {
+          ...k,
+          brew: {
+            ...k.brew,
+            pour,
+            quality,
+            lastDrink: k.brew.recipe,
+          },
+        };
+      }),
+    })),
 
   select: (activeId) => set({ activeId }),
   setMinimized: (id, minimized) =>

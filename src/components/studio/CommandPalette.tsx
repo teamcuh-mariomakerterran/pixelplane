@@ -144,7 +144,7 @@ export function CommandPalette() {
         id: "goodies",
         group: "Signature",
         label: "Summon Goodies Drop",
-        hint: "weapons · tiles · UI · buildings",
+        hint: "wave 1+2 · arsenal · brew district",
         keywords: "goodies gear weapons roads ui buildings inventory",
         run: () => {
           void summonGoodiesDrop().then((n) => {
@@ -170,6 +170,16 @@ export function CommandPalette() {
         run: () => {
           useKernels.getState().placeLeads();
           stampTimeline("Leads kernel");
+        },
+      },
+      {
+        id: "brew",
+        group: "Signature",
+        label: "Open Brew kernel (pour minigame)",
+        keywords: "brew bar cocktail cook pour kernel",
+        run: () => {
+          useKernels.getState().placeBrew();
+          stampTimeline("Brew kernel");
         },
       },
       {

@@ -1,5 +1,5 @@
 import { useKernels } from "@/store/kernels";
-import { Package, ListChecks, X, Minimize2, Maximize2, Link2 } from "lucide-react";
+import { Package, ListChecks, X, Minimize2, Maximize2, Link2, FlaskConical } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Inventory + Leads play kernels — skinnable mission toys. */
@@ -11,8 +11,10 @@ export function KernelOverlays() {
       {instances.map((k) =>
         k.kind === "inventory" ? (
           <InventoryKernel key={k.id} id={k.id} />
-        ) : (
+        ) : k.kind === "leads" ? (
           <LeadsKernel key={k.id} id={k.id} />
+        ) : (
+          <BrewKernel key={k.id} id={k.id} />
         ),
       )}
     </>
@@ -162,6 +164,100 @@ function LeadsKernel({ id }: { id: string }) {
             </span>
           </button>
         ))}
+      </div>
+    </div>
+  );
+}
+
+
+function BrewKernel({ id }: { id: string }) {
+  const k = useKernels((s) => s.instances.find((x) => x.id === id));
+  const remove = useKernels((s) => s.remove);
+  const setMin = useKernels((s) => s.setMinimized);
+  const heat = useKernels((s) => s.heatBrew);
+  const pour = useKernels((s) => s.pourBrew);
+  if (!k || !k.brew) return null;
+
+  if (k.minimized) {
+    return (
+      <button
+        type="button"
+        onClick={() => setMin(id, false)}
+        className="pointer-events-auto absolute left-3 top-28 z-40 flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-bg-elevated/95 px-2 py-1.5 text-[10px] text-amber-300 shadow-lg"
+      >
+        <FlaskConical size={12} /> Brew
+        <Maximize2 size={10} />
+      </button>
+    );
+  }
+
+  const q = k.brew.quality;
+  const qColor =
+    q === "perfect"
+      ? "text-lime-300"
+      : q === "burned"
+        ? "text-danger"
+        : q === "raw"
+          ? "text-subtle"
+          : "text-cyan-300";
+
+  return (
+    <div className="pointer-events-auto absolute left-3 top-28 z-40 w-[240px] rounded-lg border border-amber-500/40 bg-[#100e18]/95 shadow-2xl backdrop-blur-md">
+      <div className="flex items-center gap-1.5 border-b border-border px-2 py-1.5">
+        <FlaskConical size={12} className="text-amber-300" />
+        <span className="text-[11px] font-semibold text-fg">Brew kernel</span>
+        <button type="button" className="ml-auto text-subtle hover:text-fg" onClick={() => setMin(id, true)}>
+          <Minimize2 size={12} />
+        </button>
+        <button type="button" className="text-subtle hover:text-danger" onClick={() => remove(id)}>
+          <X size={12} />
+        </button>
+      </div>
+      <div className="space-y-2 p-2">
+        <div className="text-[10px] text-muted">Recipe</div>
+        <div className="rounded border border-border/60 bg-surface/50 px-2 py-1 text-[11px] font-semibold text-cyan-200">
+          {k.brew.recipe}
+        </div>
+        <div className="flex items-center justify-between text-[10px]">
+          <span className="text-muted">Heat</span>
+          <span className="font-mono text-fg">{k.brew.heat}°</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-surface">
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-amber-400 to-pink-500 transition-all"
+            style={{ width: `${k.brew.heat}%` }}
+          />
+        </div>
+        <div className="flex gap-1">
+          <button
+            type="button"
+            className="flex-1 rounded border border-border py-1 text-[10px] text-muted hover:border-cyan-500/50"
+            onClick={() => heat(id, -8)}
+          >
+            Cool
+          </button>
+          <button
+            type="button"
+            className="flex-1 rounded border border-border py-1 text-[10px] text-muted hover:border-amber-500/50"
+            onClick={() => heat(id, 10)}
+          >
+            Heat
+          </button>
+        </div>
+        <button
+          type="button"
+          className="w-full rounded-md border border-amber-500/50 bg-amber-500/15 py-1.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/25"
+          onClick={() => pour(id)}
+        >
+          Pour
+        </button>
+        <div className={cn("text-center text-[10px] font-semibold uppercase", qColor)}>
+          {q}
+          {k.brew.lastDrink ? ` · ${k.brew.lastDrink}` : ""}
+        </div>
+        <div className="text-[9px] text-subtle">
+          Sweet spot 55–72° · art on plane under Brew/Bar boards
+        </div>
       </div>
     </div>
   );
