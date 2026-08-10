@@ -150,6 +150,10 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 
 ## 3. Changelog (newest first)
 
+### 2026-08-10 — Goodies wave 7 · EMS · bikes · factories · interiors
+- **+34 sheets (115 citykit total):** motorcycles (clean→wreck), EMS fleet + damage, sports/color cars, taxi damage, heavy factories, living-room interiors, mega fortresses, dense cyber facades, server rooms, purple modular pipes, rail+crane kit, garden helipads
+- **Ctrl+K → city kit** dumps all 115
+
 ### 2026-08-10 — Goodies wave 6 · Port · rails · neon fleet
 - **+26 sheets (81 citykit total):** hospitals/civic, port cranes/containers, rail tracks, rust sedans, civilian fleet, armored side views, neon road strips/props, labeled venues, purple pods, midrise apts, industrial fronts, hangars, slum roofs, tiered forts
 - **Ctrl+K → city kit** dumps all 81
