@@ -1,8 +1,8 @@
 {
   "id": "goodies-drop",
   "name": "Goodies Drop \u2014 Night Ops",
-  "version": 2,
-  "description": "Wave1+2: gear, buildings, office props, quest items, brew/cook drinks, UI",
+  "version": 3,
+  "description": "Wave1-3: gear, skyline buildings, brew, quest tools",
   "assets": [
     {
       "file": "buildings/industrial_hangar_ship.jpg",
@@ -46,6 +46,10 @@
     },
     {
       "file": "drinks/bladerunner_menu.jpg",
+      "kind": "drinks"
+    },
+    {
+      "file": "drinks/brewing_station_full.jpg",
       "kind": "drinks"
     },
     {
@@ -133,6 +137,10 @@
       "kind": "props"
     },
     {
+      "file": "props/psu_fan_cube.jpg",
+      "kind": "props"
+    },
+    {
       "file": "props/shelf_emptyish.png",
       "kind": "props"
     },
@@ -143,6 +151,66 @@
     {
       "file": "roads/city_road_grid.png",
       "kind": "roads"
+    },
+    {
+      "file": "skyline/beacon_spire.jpg",
+      "kind": "skyline"
+    },
+    {
+      "file": "skyline/broadcast_tower.jpg",
+      "kind": "skyline"
+    },
+    {
+      "file": "skyline/chrome_tools.jpg",
+      "kind": "skyline"
+    },
+    {
+      "file": "skyline/control_tower.jpg",
+      "kind": "skyline"
+    },
+    {
+      "file": "skyline/core_stack.jpg",
+      "kind": "skyline"
+    },
+    {
+      "file": "skyline/corp_tower.jpg",
+      "kind": "skyline"
+    },
+    {
+      "file": "skyline/data_core.jpg",
+      "kind": "skyline"
+    },
+    {
+      "file": "skyline/diamond_hq.jpg",
+      "kind": "skyline"
+    },
+    {
+      "file": "skyline/duplex_neon.jpg",
+      "kind": "skyline"
+    },
+    {
+      "file": "skyline/fire_escape_block.jpg",
+      "kind": "skyline"
+    },
+    {
+      "file": "skyline/hab_fortress.jpg",
+      "kind": "skyline"
+    },
+    {
+      "file": "skyline/holo_gear.jpg",
+      "kind": "skyline"
+    },
+    {
+      "file": "skyline/plaza_twins.jpg",
+      "kind": "skyline"
+    },
+    {
+      "file": "skyline/sat_hub.jpg",
+      "kind": "skyline"
+    },
+    {
+      "file": "skyline/ware_6x6.jpg",
+      "kind": "skyline"
     },
     {
       "file": "solitaire/win_loss_counter.png",

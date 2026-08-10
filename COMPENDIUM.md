@@ -150,6 +150,11 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 
 ## 3. Changelog (newest first)
 
+### 2026-08-10 — Goodies wave 3 · Skyline kit
+- **15 iso buildings:** Corp tower, Control, WARE 6×6, Plaza twins, Broadcast, Chrome Tools, Holo Gear, Core Stack, duplex, Data core, Beacon spire, Hab Fortress, Diamond HQ, Sat hub, fire-escape block + PSU fan prop
+- **Full brew station** art behind Brew kernel
+- **Ctrl+K → skyline** (fast kit) · **quest tools** loads 8 named slots (Audio Deck → Access Pass)
+
 ### 2026-08-10 — Goodies wave 2 + Brew kernel
 - **+24 assets:** office furniture, landmarks/metro, hangars, named street shops, ports, heavy weapon sheets, quest tools/gadgets, scavenge loot, full bar/cook/brew district art
 - **Brew kernel:** heat/cool/pour minigame (sweet spot 55–72°) skinned from bar drop

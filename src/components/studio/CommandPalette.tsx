@@ -11,7 +11,7 @@ import { useSignature } from "@/store/signature";
 import { TOOL_LABELS } from "@/lib/hotkeys/defaults";
 import type { ToolId } from "@/lib/pixel/types";
 import { summonNightDistrict } from "@/lib/packs/night-district";
-import { summonGoodiesDrop } from "@/lib/packs/goodies";
+import { summonGoodiesDrop, summonSkylineSet } from "@/lib/packs/goodies";
 import { stampTimeline } from "@/store/timeline";
 import { useKernels } from "@/store/kernels";
 import { useSoundSprites } from "@/store/sound-sprites";
@@ -144,11 +144,23 @@ export function CommandPalette() {
         id: "goodies",
         group: "Signature",
         label: "Summon Goodies Drop",
-        hint: "wave 1+2 · arsenal · brew district",
-        keywords: "goodies gear weapons roads ui buildings inventory",
+        hint: "wave 1–3 · arsenal · brew · skyline",
+        keywords: "goodies gear weapons roads ui buildings inventory skyline",
         run: () => {
           void summonGoodiesDrop().then((n) => {
             if (n) stampTimeline("Goodies Drop", `${n} boards`);
+          });
+        },
+      },
+      {
+        id: "skyline",
+        group: "Signature",
+        label: "Summon Skyline kit only",
+        hint: "15 iso buildings · fast",
+        keywords: "skyline buildings iso city tower ware chrome holo fortress",
+        run: () => {
+          void summonSkylineSet().then((n) => {
+            if (n) stampTimeline("Skyline kit", `${n} buildings`);
           });
         },
       },
@@ -160,6 +172,17 @@ export function CommandPalette() {
         run: () => {
           useKernels.getState().placeInventory();
           stampTimeline("Inventory kernel");
+        },
+      },
+      {
+        id: "questtools",
+        group: "Signature",
+        label: "Inventory + load quest tools",
+        keywords: "quest tools audio deck wrench access pass matrix",
+        run: () => {
+          const id = useKernels.getState().placeInventory();
+          useKernels.getState().loadQuestTools(id);
+          stampTimeline("Quest tools pack");
         },
       },
       {

@@ -1,11 +1,12 @@
 /**
  * Play kernels — skinnable mini play surfaces on/near the plane.
- * Solitaire was first; Inventory + Leads are next.
+ * Inventory, Leads, Brew (+ quest-tool labels from goodies drop).
  */
 
 import { create } from "zustand";
 import { uid } from "@/lib/utils";
 import { useStudio } from "@/store/studio";
+import { QUEST_TOOL_LABELS } from "@/lib/packs/goodies";
 
 export type KernelKind = "inventory" | "leads" | "brew";
 
@@ -27,15 +28,12 @@ export type KernelInstance = {
   id: string;
   kind: KernelKind;
   name: string;
-  x: number; // screen-ish docked overlay uses fixed UI; keep for future plane pin
+  x: number;
   y: number;
   minimized: boolean;
-  // inventory
   slots?: InventorySlot[];
   selectedSlot?: string | null;
-  // leads
   leads?: LeadItem[];
-  // brew mini
   brew?: {
     recipe: string;
     heat: number;
@@ -60,6 +58,7 @@ type KernelState = {
   toggleSlot: (id: string, slotId: string) => void;
   toggleLead: (id: string, leadId: string) => void;
   bindGearSheet: (id: string) => void;
+  loadQuestTools: (id: string) => void;
 };
 
 const SLOT_COLORS = [
@@ -96,6 +95,15 @@ function defaultSlots(): InventorySlot[] {
   }));
 }
 
+function questToolSlots(): InventorySlot[] {
+  return QUEST_TOOL_LABELS.map((label, i) => ({
+    id: uid("slot"),
+    label,
+    filled: true,
+    color: SLOT_COLORS[i % SLOT_COLORS.length]!,
+  }));
+}
+
 function defaultLeads(): LeadItem[] {
   return [
     {
@@ -118,8 +126,14 @@ function defaultLeads(): LeadItem[] {
     },
     {
       id: uid("lead"),
-      title: "Night District sweep",
-      detail: "Map feed planes",
+      title: "Hit Chrome Tools",
+      detail: "Stock quest gadgets",
+      done: false,
+    },
+    {
+      id: uid("lead"),
+      title: "Broadcast tower ping",
+      detail: "Low-freq audio deck",
       done: false,
     },
   ];
@@ -134,7 +148,7 @@ export const useKernels = create<KernelState>((set, get) => ({
     const inst: KernelInstance = {
       id,
       kind: "inventory",
-      name: "Inventory kernel",
+      name: "Inventory",
       x: 0,
       y: 0,
       minimized: false,
@@ -142,7 +156,7 @@ export const useKernels = create<KernelState>((set, get) => ({
       selectedSlot: null,
     };
     set((s) => ({ instances: [...s.instances, inst], activeId: id }));
-    useStudio.getState().setStatus("Inventory kernel · skin with gear boards");
+    useStudio.getState().setStatus("Inventory kernel · gear slots");
     return id;
   },
 
@@ -161,6 +175,7 @@ export const useKernels = create<KernelState>((set, get) => ({
     useStudio.getState().setStatus("Leads kernel · mission checklist");
     return id;
   },
+
   placeBrew: () => {
     const id = uid("ker");
     const recipes = [
@@ -170,6 +185,8 @@ export const useKernels = create<KernelState>((set, get) => ({
       "Cyan Bolt",
       "Magenta Flash",
       "Aged Eclipse",
+      "Chackenay Navy",
+      "Bond Social Drink",
     ];
     const inst: KernelInstance = {
       id,
@@ -231,10 +248,12 @@ export const useKernels = create<KernelState>((set, get) => ({
       }),
     })),
 
-  select: (activeId) => set({ activeId }),
-  setMinimized: (id, minimized) =>
+  select: (id) => set({ activeId: id }),
+  setMinimized: (id, v) =>
     set((s) => ({
-      instances: s.instances.map((k) => (k.id === id ? { ...k, minimized } : k)),
+      instances: s.instances.map((k) =>
+        k.id === id ? { ...k, minimized: v } : k,
+      ),
     })),
   remove: (id) =>
     set((s) => ({
@@ -270,15 +289,46 @@ export const useKernels = create<KernelState>((set, get) => ({
     })),
 
   bindGearSheet: (id) => {
-    const board = useStudio
+    const labels = [
+      "Rifle",
+      "Pistol",
+      "Blade",
+      "Helm",
+      "Goggles",
+      "Armor",
+      "Gauntlets",
+      "Boots",
+      "Grenade",
+      "Stim",
+      "Deck",
+      "Case",
+    ];
+    set((s) => ({
+      instances: s.instances.map((k) => {
+        if (k.id !== id) return k;
+        return {
+          ...k,
+          slots: labels.map((label, i) => ({
+            id: uid("slot"),
+            label,
+            filled: true,
+            color: SLOT_COLORS[i % SLOT_COLORS.length]!,
+          })),
+        };
+      }),
+    }));
+    useStudio.getState().setStatus("Inventory skinned to gear sheet labels");
+  },
+
+  loadQuestTools: (id) => {
+    set((s) => ({
+      instances: s.instances.map((k) => {
+        if (k.id !== id) return k;
+        return { ...k, slots: questToolSlots(), name: "Quest tools" };
+      }),
+    }));
+    useStudio
       .getState()
-      .artboards.find((b) => /gear|weapon|armor|inventory/i.test(b.name));
-    if (!board) {
-      useStudio.getState().setStatus("No gear board — Summon Goodies first");
-      return;
-    }
-    useStudio.getState().selectArtboard(board.id);
-    useStudio.getState().setStatus(`Inventory bound visual ref · ${board.name}`);
-    get().select(id);
+      .setStatus("Inventory · 8 quest tools loaded (Audio Deck → Access Pass)");
   },
 }));
