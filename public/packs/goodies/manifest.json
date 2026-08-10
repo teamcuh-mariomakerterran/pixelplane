@@ -1,8 +1,8 @@
 {
   "id": "goodies-drop",
   "name": "Goodies Drop \u2014 Night Ops",
-  "version": 5,
-  "description": "Wave1-5: gear, skyline, citykit (55 sheets), props, brew",
+  "version": 6,
+  "description": "Wave1-6: gear, skyline, citykit (81 sheets), props, brew",
   "assets": [
     {
       "file": "buildings/industrial_hangar_ship.jpg",
@@ -49,6 +49,10 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/buildings_industrial_front.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/cars_clean_damaged.jpg",
       "kind": "citykit"
     },
@@ -66,6 +70,10 @@
     },
     {
       "file": "citykit/civic_temples_topdown.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/compounds_L_cross_T.jpg",
       "kind": "citykit"
     },
     {
@@ -109,7 +117,19 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/forts_tiered_purple.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/hangars_airport_tanks.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/hangars_cranes.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/hospitals_civic.jpg",
       "kind": "citykit"
     },
     {
@@ -133,7 +153,15 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/industrial_rooftop_plant.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/mansions_gothic_cyber.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/midrise_apartments.jpg",
       "kind": "citykit"
     },
     {
@@ -149,7 +177,19 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/modular_neon_purple.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/pipes_ducts_hubs.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/pods_purple_modular.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/port_cranes_containers.jpg",
       "kind": "citykit"
     },
     {
@@ -157,7 +197,15 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/rails_tracks_connectors.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/road_markings.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/roads_curves_Y_full.jpg",
       "kind": "citykit"
     },
     {
@@ -173,6 +221,22 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/roads_neon_props_full.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/roads_neon_strips.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/roads_tiles_props_signs.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/roofs_dark_civic.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/roofs_green_solar.jpg",
       "kind": "citykit"
     },
@@ -185,7 +249,15 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/roofs_labeled_venues.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/roofs_simple_grid.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/roofs_slum_iso.jpg",
       "kind": "citykit"
     },
     {
@@ -209,6 +281,10 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/skyline_mixed_atrium.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/storefront_facades_flat.jpg",
       "kind": "citykit"
     },
@@ -221,11 +297,19 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/street_props_manholes.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/towers_highrise_purple.jpg",
       "kind": "citykit"
     },
     {
       "file": "citykit/towers_neon_jp_labels.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/towers_neon_skyscraper.jpg",
       "kind": "citykit"
     },
     {
@@ -245,6 +329,10 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/trains_hover_cars.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/trains_maglev_sets.jpg",
       "kind": "citykit"
     },
@@ -253,7 +341,23 @@
       "kind": "citykit"
     },
     {
+      "file": "citykit/utility_plants_small.jpg",
+      "kind": "citykit"
+    },
+    {
       "file": "citykit/vehicles_armored.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/vehicles_armored_side.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/vehicles_civilian_fleet.jpg",
+      "kind": "citykit"
+    },
+    {
+      "file": "citykit/vehicles_rust_sedans.jpg",
       "kind": "citykit"
     },
     {
