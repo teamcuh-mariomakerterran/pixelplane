@@ -32,6 +32,7 @@ import { usePlaneSystems } from "@/store/plane-systems";
 import { useMemoryWeb } from "@/store/memory-web";
 import { useCharacterDistrict } from "@/store/character-district";
 import { useStudio } from "@/store/studio";
+import { useSignature } from "@/store/signature";
 import { compositeLayers } from "@/lib/pixel/buffer";
 import { FX_EXPLOSIONS } from "@/lib/icon-library/pixel-packs";
 import { ArrowLeft, Crosshair, Car, Building2, ScrollText, Ghost } from "lucide-react";
@@ -62,6 +63,7 @@ export function CityEngineView() {
   const mapImg = useRef<HTMLImageElement | null>(null);
   const vehImg = useRef<HTMLImageElement | null>(null);
   const boomFrames = useRef<HTMLImageElement[]>([]);
+  const heroImg = useRef<HTMLImageElement | null>(null);
   const [hud, setHud] = useState({
     status: "",
     mode: "foot",
@@ -83,6 +85,12 @@ export function CityEngineView() {
       im.src = src;
       return im;
     });
+    const hero = new Image();
+    hero.crossOrigin = "anonymous";
+    hero.src = "/packs/night-district/cyberpunk_male_main_character.png";
+    hero.onload = () => {
+      heroImg.current = hero;
+    };
   }, []);
 
   useEffect(() => {
@@ -456,23 +464,42 @@ export function CityEngineView() {
         );
       }
 
-      // player
+      // player — Night District hero when equipped
       {
         const px = ox + s.player.x * z;
         const py = oy + s.player.y * z;
         if (s.player.mode === "foot") {
-          ctx.fillStyle = under ? "#fbbf24" : "#e8a838";
-          ctx.beginPath();
-          ctx.arc(px, py, 7, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = "#111";
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-          ctx.strokeStyle = "#fff";
-          ctx.beginPath();
-          ctx.moveTo(px, py);
-          ctx.lineTo(px + Math.cos(s.player.rot) * 12, py + Math.sin(s.player.rot) * 12);
-          ctx.stroke();
+          const useHero =
+            useSignature.getState().nightHeroInEngine &&
+            heroImg.current &&
+            heroImg.current.complete;
+          if (useHero) {
+            const hs = 28 * z;
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.rotate(s.player.rot + Math.PI / 2);
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(heroImg.current!, -hs / 2, -hs * 0.75, hs, hs);
+            ctx.restore();
+            // ground shadow
+            ctx.fillStyle = "rgba(0,0,0,0.35)";
+            ctx.beginPath();
+            ctx.ellipse(px, py + 4 * z, 8 * z, 3 * z, 0, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            ctx.fillStyle = under ? "#fbbf24" : "#e8a838";
+            ctx.beginPath();
+            ctx.arc(px, py, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = "#111";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.strokeStyle = "#fff";
+            ctx.beginPath();
+            ctx.moveTo(px, py);
+            ctx.lineTo(px + Math.cos(s.player.rot) * 12, py + Math.sin(s.player.rot) * 12);
+            ctx.stroke();
+          }
         }
       }
 

@@ -1,0 +1,51 @@
+import { chromium } from "playwright";
+const b = await chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+const p = await b.newPage({ viewport: { width: 1440, height: 900 } });
+const errs = [];
+p.on("pageerror", (e) => errs.push(String(e)));
+p.on("console", (m) => { if (m.type() === "error") errs.push(m.text()); });
+await p.goto("http://127.0.0.1:8080/", { waitUntil: "networkidle", timeout: 45000 });
+await p.waitForTimeout(1500);
+// Ctrl+K mutate
+await p.keyboard.down("Control");
+await p.keyboard.press("KeyK");
+await p.keyboard.up("Control");
+await p.waitForTimeout(300);
+await p.keyboard.type("mutate");
+await p.waitForTimeout(150);
+await p.keyboard.press("Enter");
+await p.waitForTimeout(800);
+// lantern
+await p.keyboard.down("Control");
+await p.keyboard.press("KeyK");
+await p.keyboard.up("Control");
+await p.waitForTimeout(200);
+await p.keyboard.type("lantern");
+await p.waitForTimeout(100);
+await p.keyboard.press("Enter");
+await p.waitForTimeout(500);
+// orbit pin
+await p.keyboard.down("Control");
+await p.keyboard.press("KeyK");
+await p.keyboard.up("Control");
+await p.waitForTimeout(200);
+await p.keyboard.type("orbit");
+await p.waitForTimeout(100);
+await p.keyboard.press("Enter");
+await p.waitForTimeout(400);
+await p.screenshot({ path: "/workspace/screenshots/layer2-plane.png" });
+// city engine hero
+await p.keyboard.down("Control");
+await p.keyboard.press("KeyK");
+await p.keyboard.up("Control");
+await p.waitForTimeout(200);
+await p.keyboard.type("enter city");
+await p.waitForTimeout(100);
+await p.keyboard.press("Enter");
+await p.waitForTimeout(2000);
+await p.screenshot({ path: "/workspace/screenshots/layer2-engine.png" });
+const body = await p.locator("body").innerText();
+const engine = /City Engine|Birthplace|freestyle/i.test(body);
+console.log(JSON.stringify({ engine, errs: errs.slice(0, 10), body: body.replace(/\s+/g," ").slice(0,180) }));
+await b.close();
+process.exit(errs.length ? 2 : 0);

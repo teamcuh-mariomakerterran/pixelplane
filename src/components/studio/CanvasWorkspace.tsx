@@ -12,6 +12,7 @@ import { useSpatialNav } from "@/store/spatial-nav";
 import { useCharacterDistrict } from "@/store/character-district";
 import { useCollab } from "@/store/collab";
 import { useMemoryWeb } from "@/store/memory-web";
+import { useSignature } from "@/store/signature";
 import { compositeLayers, bufferToImageData } from "@/lib/pixel/buffer";
 import { wireZoneHeat, worldCenterFromCamera } from "@/lib/spatial/wave-a";
 import { zoneWorld, padWorld } from "@/lib/character-district/layout";
@@ -932,6 +933,120 @@ export function CanvasWorkspace() {
         }
         ctx.fillStyle = L.color;
         ctx.fillText(L.text, L.x, L.y);
+      }
+
+      // --- Wave B: Diff Lantern (world-space hot pixels) ---
+      {
+        const sig = useSignature.getState();
+        if (sig.diffEnabled && sig.diffResult) {
+          const d = sig.diffResult;
+          const age = (performance.now() / 1000) % 1;
+          const pulse = 0.55 + 0.45 * Math.sin(age * Math.PI * 2);
+          const img = bufferToImageData(d.data, d.w, d.h);
+          // temp canvas for alpha pulse
+          const tmp = document.createElement("canvas");
+          tmp.width = d.w;
+          tmp.height = d.h;
+          const tctx = tmp.getContext("2d");
+          if (tctx) {
+            tctx.putImageData(img, 0, 0);
+            ctx.save();
+            ctx.globalAlpha = pulse;
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(
+              tmp,
+              cam.x + d.x * cam.zoom,
+              cam.y + d.y * cam.zoom,
+              d.w * cam.zoom,
+              d.h * cam.zoom,
+            );
+            ctx.restore();
+            // lantern rim
+            ctx.strokeStyle = `rgba(255,180,40,${0.4 + pulse * 0.4})`;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(
+              cam.x + d.x * cam.zoom - 2,
+              cam.y + d.y * cam.zoom - 2,
+              d.w * cam.zoom + 4,
+              d.h * cam.zoom + 4,
+            );
+            ctx.fillStyle = "rgba(255,180,40,0.9)";
+            ctx.font = "10px ui-sans-serif, system-ui";
+            ctx.fillText(
+              `LANTERN · ${d.changed} Δ · ${d.aName} ↔ ${d.bName}`,
+              cam.x + d.x * cam.zoom,
+              cam.y + d.y * cam.zoom - 6,
+            );
+          }
+        }
+      }
+
+      // --- Wave B: Reference Orbit (screen-space pin cards) ---
+      {
+        const sig = useSignature.getState();
+        if (sig.orbitEnabled && sig.orbitPins.length) {
+          const t = performance.now() / 1000;
+          const cx = sw * 0.5;
+          const cy = sh * 0.42;
+          const n = sig.orbitPins.length;
+          const boards = state.artboards;
+          for (let i = 0; i < n; i++) {
+            const pin = sig.orbitPins[i];
+            const board = boards.find((b) => b.id === pin.boardId);
+            if (!board) continue;
+            const ang = t * sig.orbitSpeed + (i / n) * Math.PI * 2;
+            const r = sig.orbitRadius + Math.sin(t * 1.7 + i) * 8;
+            const sx = cx + Math.cos(ang) * r;
+            const sy = cy + Math.sin(ang) * r * 0.55;
+            // card
+            const cardW = 72;
+            const cardH = 56;
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.rotate(Math.sin(t + i) * 0.05);
+            ctx.fillStyle = "rgba(15,18,28,0.92)";
+            ctx.strokeStyle = "rgba(62,207,207,0.75)";
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.rect(-cardW / 2, -cardH / 2, cardW, cardH);
+            ctx.fill();
+            ctx.stroke();
+            // mini thumb
+            try {
+              const comp = compositeLayers(board.layers, board.width, board.height);
+              const idata = bufferToImageData(comp, board.width, board.height);
+              const tc = document.createElement("canvas");
+              tc.width = board.width;
+              tc.height = board.height;
+              const tx = tc.getContext("2d");
+              if (tx) {
+                tx.putImageData(idata, 0, 0);
+                const max = 48;
+                const sc = Math.min(max / board.width, max / board.height);
+                const dw = board.width * sc;
+                const dh = board.height * sc;
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(tc, -dw / 2, -dh / 2 - 4, dw, dh);
+              }
+            } catch {}
+            ctx.fillStyle = "rgba(62,207,207,0.95)";
+            ctx.font = "9px ui-sans-serif, system-ui";
+            ctx.textAlign = "center";
+            const lab = pin.label.length > 12 ? pin.label.slice(0, 11) + "…" : pin.label;
+            ctx.fillText(lab, 0, cardH / 2 - 6);
+            ctx.textAlign = "start";
+            ctx.restore();
+            // tether to world board
+            const bx = cam.x + (board.x + board.width / 2) * cam.zoom;
+            const by = cam.y + (board.y + board.height / 2) * cam.zoom;
+            ctx.strokeStyle = "rgba(62,207,207,0.2)";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.lineTo(bx, by);
+            ctx.stroke();
+          }
+        }
       }
 
       // Hover pixel crosshair hint

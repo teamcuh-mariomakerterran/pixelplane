@@ -286,6 +286,21 @@ export const FEATURE_TIPS: Record<string, FeatureTip> = {
     body: "Nearby artboards pull colors into a living field under your brush. Click a swatch to lock it.",
     creative: "Paint with the neighborhood, not just the tray.",
   },
+  mutation_rails: {
+    title: "Mutation rails",
+    body: "Spawn neon / dusk / silhouette / chrome variants from the active board — cohesion without re-rolling AI.",
+    creative: "Pick a rail and keep iterating. The plane remembers the lineage.",
+  },
+  diff_lantern: {
+    title: "Diff lantern",
+    body: "Hot pixels show where the active board diverges from its nearest neighbor.",
+    creative: "Point the lantern at two drafts and only the truth glows.",
+  },
+  reference_orbit: {
+    title: "Reference orbit",
+    body: "Pin boards into screen-space cards that orbit your view — always in peripheral vision.",
+    creative: "Your references should feel like satellites, not a buried panel.",
+  },
   night_district: {
     title: "Night District",
     body: "Summon a cyberpunk pack onto the plane — hero, blocks, roads, fleet, FX — as real artboards.",

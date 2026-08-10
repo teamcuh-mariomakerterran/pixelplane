@@ -150,6 +150,14 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 
 ## 3. Changelog (newest first)
 
+### 2026-08-10 — Holy Shit Layer II (Wave B production magic)
+- **Reference Orbit:** pin boards → cyan satellite cards orbit the view with tethers
+- **Diff Lantern:** compare active board vs nearest neighbor; hot amber Δ pixels
+- **Mutation Rails:** neon / dusk / silhouette / chrome variants from one board
+- **Night District hero in City Engine:** cyberpunk chassis sprite on foot (toggleable)
+- Systems dock: Orbit · Lantern · Mutate · Command palette entries
+- Status: Wave B signature systems 5–8 shipped (palette gravity was Layer I)
+
 ### 2026-08-10 — Post-Calamity Ascension (freestyle era)
 - **Doctrine:** freestyle is good; the First Calamity taught us backups. Git is mandatory.
 - **First Calamity (record):** mid-Wave-A partial file writes destroyed `CanvasWorkspace`, hotkey defaults, briefly studio store — no git yet. Rebuilt from bundle + architecture knowledge. **Matter of record: never again without commits.**
@@ -531,8 +539,8 @@ Brian’s directive (2026-08-01): **do not pick only a few** — implement the f
 - **Status:** Planned
 
 ### 6.7 Diff lantern
-- **Idea:** Compare two boards; lantern brush shows only differing pixels.
-- **Status:** Planned
+- **Idea:** Compare two boards; lantern shows only differing pixels.
+- **Status:** Shipped (Layer II) — nearest-neighbor compare + hot overlay
 
 ### 6.8 Session ghosts
 - **Idea:** Optional thumbnail snapshot when saving F-key location; show ghost under current.
@@ -545,7 +553,7 @@ Brian’s directive (2026-08-01): **do not pick only a few** — implement the f
 
 ### 6.10 Reference orbit
 - **Idea:** Pin reference in screen space or world space; toggle orbit mode.
-- **Status:** Planned
+- **Status:** Shipped (Layer II) — screen-space satellite cards + tethers
 
 ### 6.11 Constraint stamps
 - **Idea:** Spatial 48×48 / tile cages; paste/generate auto-fits; sync size to engine folders.

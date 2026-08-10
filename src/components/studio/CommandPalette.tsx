@@ -7,6 +7,7 @@ import { useCharacterDistrict } from "@/store/character-district";
 import { useCityDistrict } from "@/store/city-district";
 import { usePlaneSystems } from "@/store/plane-systems";
 import { useCollab } from "@/store/collab";
+import { useSignature } from "@/store/signature";
 import { TOOL_LABELS } from "@/lib/hotkeys/defaults";
 import type { ToolId } from "@/lib/pixel/types";
 import { summonNightDistrict } from "@/lib/packs/night-district";
@@ -110,6 +111,42 @@ export function CommandPalette() {
         label: "Constraint stamp tool",
         keywords: "stamp cage pixel",
         run: () => useStudio.getState().setTool("constraint-stamp"),
+      },
+      {
+        id: "orbit",
+        group: "Signature",
+        label: "Pin board to Reference Orbit",
+        keywords: "orbit reference pin",
+        run: () => useSignature.getState().pinActiveToOrbit(),
+      },
+      {
+        id: "lantern",
+        group: "Signature",
+        label: "Diff lantern (compare boards)",
+        keywords: "diff lantern compare",
+        run: () => useSignature.getState().runDiffLantern(),
+      },
+      {
+        id: "mutate",
+        group: "Signature",
+        label: "Mutation rails (4 variants)",
+        keywords: "mutation rails neon dusk chrome",
+        run: () => useSignature.getState().spawnMutationRails(),
+      },
+      {
+        id: "nighthero",
+        group: "Signature",
+        label: "Toggle Night District hero in Engine",
+        keywords: "hero player sprite engine",
+        run: () => {
+          const s = useSignature.getState();
+          s.setNightHeroInEngine(!s.nightHeroInEngine);
+          useStudio.getState().setStatus(
+            !s.nightHeroInEngine
+              ? "Night District hero ON in City Engine"
+              : "Night District hero OFF · amber dot player",
+          );
+        },
       },
       {
         id: "engine",

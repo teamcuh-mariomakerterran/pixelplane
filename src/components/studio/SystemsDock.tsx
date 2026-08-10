@@ -2,6 +2,7 @@ import { usePlaneSystems } from "@/store/plane-systems";
 import { useCollab } from "@/store/collab";
 import { useStudio } from "@/store/studio";
 import { useWaveA } from "@/store/wave-a";
+import { useSignature } from "@/store/signature";
 import { scopeForZone } from "@/lib/spatial/scope";
 import {
   Eye,
@@ -13,6 +14,9 @@ import {
   Users,
   Flame,
   Ghost,
+  Orbit,
+  Lamp,
+  GitBranch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +36,9 @@ export function SystemsDock() {
   const joined = useCollab((s) => s.joined);
   const showHeat = useWaveA((s) => s.showWireHeatMap);
   const showGhosts = useWaveA((s) => s.showSessionGhosts);
+  const orbitOn = useSignature((s) => s.orbitEnabled);
+  const orbitN = useSignature((s) => s.orbitPins.length);
+  const diffOn = useSignature((s) => s.diffEnabled);
 
   return (
     <div className="pointer-events-none absolute left-2 top-14 z-[45] flex max-w-[220px] flex-col gap-1.5">
@@ -127,6 +134,35 @@ export function SystemsDock() {
             }}
           >
             <Ghost size={12} /> Ghosts
+          </DockBtn>
+          <DockBtn
+            active={orbitOn && orbitN > 0}
+            title="Reference Orbit — pin active board; cards circle the view"
+            onClick={() => {
+              const sig = useSignature.getState();
+              if (!sig.orbitPins.length) sig.pinActiveToOrbit();
+              else sig.setOrbitEnabled(!sig.orbitEnabled);
+            }}
+          >
+            <Orbit size={12} /> Orbit {orbitN || ""}
+          </DockBtn>
+          <DockBtn
+            active={diffOn}
+            title="Diff lantern — hot pixels where two boards diverge"
+            onClick={() => {
+              const sig = useSignature.getState();
+              if (sig.diffEnabled) sig.clearDiff();
+              else sig.runDiffLantern();
+            }}
+          >
+            <Lamp size={12} /> Lantern
+          </DockBtn>
+          <DockBtn
+            active={false}
+            title="Mutation rails — spawn neon/dusk/silhouette/chrome variants"
+            onClick={() => useSignature.getState().spawnMutationRails()}
+          >
+            <GitBranch size={12} /> Mutate
           </DockBtn>
         </div>
         <div className="mt-1 px-1 text-[9px] text-subtle">
