@@ -39,7 +39,7 @@ const LAYOUT: Item[] = [
   { file: "buildings/industrial_hangar_ship.jpg", name: "Industrial · hangar & ship", x: 360, y: 980, max: 300 },
   { file: "buildings/street_shops_named.jpg", name: "Street · named shops", x: 700, y: 980, max: 320 },
   { file: "buildings/ports_cargo_power.jpg", name: "Ports · cargo & power", x: 1060, y: 980, max: 300 },
-  { file: "props/cyber_office_furniture.jpg", name: "Props · cyber office furniture", x: 1400, y: 980, max: 240 },
+  { file: "props/cyber_office_furniture.png", name: "Props · cyber office furniture", x: 1400, y: 980, max: 240 },
   // Wave 2 — gear arsenal
   { file: "gear/weapons_cyan_heavy.png", name: "Gear · cyan heavy weapons", x: 0, y: 1380, max: 360 },
   { file: "gear/weapons_blue_magic.png", name: "Gear · blue magic arsenal", x: 400, y: 1380, max: 320 },
