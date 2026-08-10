@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 /**
  * Dock for hard plane systems: private mask, watch mode, chunk grid, export map,
  * Wave A: wire heat + session ghosts.
+ * z-[45] sits above tip overlays (z-40) so tips never block dock clicks.
  */
 export function SystemsDock() {
   const maskTool = usePlaneSystems((s) => s.maskTool);
@@ -33,7 +34,7 @@ export function SystemsDock() {
   const showGhosts = useWaveA((s) => s.showSessionGhosts);
 
   return (
-    <div className="pointer-events-none absolute left-2 top-14 z-20 flex max-w-[220px] flex-col gap-1.5">
+    <div className="pointer-events-none absolute left-2 top-14 z-[45] flex max-w-[220px] flex-col gap-1.5">
       <div className="pointer-events-auto rounded-lg border border-border/80 bg-bg-elevated/95 p-1.5 shadow-lg backdrop-blur">
         <div className="mb-1 px-1 text-[9px] font-semibold uppercase tracking-wider text-muted">
           Plane systems

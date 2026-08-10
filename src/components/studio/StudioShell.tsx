@@ -46,7 +46,7 @@ function runAction(action: HotkeyAction) {
     state.setTool(action.tool);
     if (action.tool !== "wire-zone") state.setActiveConnector(null);
     // first-use tip near center-left of viewport
-    hk.pushTip(action.tool, { x: 72, y: 100 });
+    hk.pushTip(action.tool, { x: 280, y: 100 });
     return;
   }
 
@@ -123,8 +123,8 @@ export function StudioShell() {
       setReady(true);
       // intro tip for bookmarks once
       setTimeout(() => {
-        useHotkeys.getState().pushTip("bookmarks", { x: 80, y: 64 });
-        useHotkeys.getState().pushTip("minimap", { x: window.innerWidth - 360, y: window.innerHeight - 220 });
+        useHotkeys.getState().pushTip("bookmarks", { x: 280, y: 72 });
+        // minimap tip deferred — one tip at a time; shows when user first pans near it via FEATURE later
       }, 1200);
     })();
     return () => {
@@ -161,7 +161,7 @@ export function StudioShell() {
     const unsub = useStudio.subscribe((s) => {
       if (s.tool !== prev) {
         prev = s.tool;
-        useHotkeys.getState().pushTip(s.tool, { x: 72, y: 100 });
+        useHotkeys.getState().pushTip(s.tool, { x: 280, y: 100 });
       }
     });
     return unsub;

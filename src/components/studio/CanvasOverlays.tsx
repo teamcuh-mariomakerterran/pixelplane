@@ -4,9 +4,29 @@ import { useCollab } from "@/store/collab";
 import { Lightbulb, MapPin, Keyboard, X, AlertTriangle, Users } from "lucide-react";
 import { animCssFor, OVERLAY_KEYFRAMES } from "@/lib/ui/overlay-anim";
 
+/** Left systems dock footprint — keep tips/toasts out of this band */
+const DOCK_SAFE_LEFT = 248;
+const DOCK_SAFE_TOP = 56;
+
+function clampOverlayPos(x: number, y: number, width = 300, height = 160) {
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+  let cx = x;
+  let cy = y;
+  // If caller placed over left dock, kick tip to mid-canvas
+  if (cx < DOCK_SAFE_LEFT && cy < DOCK_SAFE_TOP + 200) {
+    cx = Math.max(DOCK_SAFE_LEFT, Math.min(vw / 2 - width / 2, vw - width - 16));
+    cy = Math.max(DOCK_SAFE_TOP + 8, Math.min(cy, vh - height - 48));
+  }
+  cx = Math.min(Math.max(12, cx), Math.max(12, vw - width - 12));
+  cy = Math.min(Math.max(48, cy), Math.max(48, vh - height - 24));
+  return { left: cx, top: cy };
+}
+
 /**
  * In-canvas tips, toasts, collab notes, hotkey dialogs — not browser modals.
  * Entrance animation is user-selectable (Shared plane panel / settings).
+ * Never covers the plane-systems dock (position clamp + dock z-index).
  */
 export function CanvasOverlays() {
   const overlays = useHotkeys((s) => s.overlays);
@@ -30,15 +50,10 @@ export function CanvasOverlays() {
     <div className="pointer-events-none absolute inset-0 z-40 overflow-hidden">
       <style>{OVERLAY_KEYFRAMES}</style>
       {overlays.map((o, i) => {
+        const pos = clampOverlayPos(o.x, o.y + i * 12);
         const style: React.CSSProperties = {
-          left: Math.min(
-            Math.max(12, o.x),
-            typeof window !== "undefined" ? window.innerWidth - 340 : o.x,
-          ),
-          top: Math.min(
-            Math.max(48, o.y + i * 8),
-            typeof window !== "undefined" ? window.innerHeight - 200 : o.y,
-          ),
+          left: pos.left,
+          top: pos.top,
           animation: animCssFor(o.anim ?? defaultAnim, customCss),
         };
 
@@ -69,6 +84,7 @@ export function CanvasOverlays() {
                   type="button"
                   className="shrink-0 text-subtle hover:text-fg"
                   onClick={() => dismiss(o.id)}
+                  aria-label="Dismiss"
                 >
                   <X size={12} />
                 </button>
@@ -92,6 +108,7 @@ export function CanvasOverlays() {
                   type="button"
                   className="rounded p-0.5 text-muted hover:bg-surface-2 hover:text-fg"
                   onClick={() => dismiss(o.id)}
+                  aria-label="Dismiss tip"
                 >
                   <X size={12} />
                 </button>

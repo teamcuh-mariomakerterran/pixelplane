@@ -28,8 +28,9 @@ export const TOOL_PIXEL_NAME: Record<string, string> = {
   particle: "particle",
   "wire-zone": "wire_zone",
   place: "beacon",
-  "game-viewport": "rect",
-  "constraint-stamp": "marquee",
+  "game-viewport": "viewport",
+  "constraint-stamp": "stamp",
+
   // extras
   private_mask: "private_mask",
   beacon: "beacon",

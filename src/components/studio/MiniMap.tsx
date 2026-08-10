@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { useEffect, useRef } from "react";
 import { useStudio } from "@/store/studio";
 import { Map as MapIcon } from "lucide-react";

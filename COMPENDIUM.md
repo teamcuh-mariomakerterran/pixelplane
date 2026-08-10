@@ -146,6 +146,13 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 
 ## 3. Changelog (newest first)
 
+### 2026-08-10 — Studio polish pass
+- Tips no longer cover Plane systems dock (dock z-[45], tip clamp, one tip at a time)
+- Wave A tool glyphs: `tool_*_viewport.png`, `tool_*_stamp.png`
+- Guide example title: `GridPaw_Feature Pipeline` → `Example_Feature Pipeline` (codename was leaking as product name)
+- MiniMap: dropped `@ts-nocheck`
+
+
 ### 2026-08-08 — Brian pixel icon packs wired (amber/cyan + UI/FX)
 - Sliced tool / pack E / pack F sheets → `/public/pixel-icons/`
 - Theme toggle: **amber · cyan · vector** (toolbar cycle + library)

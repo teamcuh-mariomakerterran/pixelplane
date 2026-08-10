@@ -2,7 +2,8 @@
 
 ## Pipeline
 
-| GridPaw_Feature Pipeline |  |  |  |  |  |
+| Example_Feature Pipeline |  |  |  |  |  |
+
 | --- | --- | --- | --- | --- | --- |
 | Feature Name | Category | Priority | Status | Dependencies | Notes |
 | The Fount coin-pusher | hub |  |  | — | Core hub attraction; coin-pusher mechanic |

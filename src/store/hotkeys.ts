@@ -233,10 +233,9 @@ export const useHotkeys = create<HotkeyState>((set, get) => ({
       thumb
         ? `Ghost snapshot stored · F${slot} jumps here`
         : `Press F${slot} to jump · Ctrl+F${slot} to overwrite`,
-      { x: 24, y: 72 },
+      { x: 280, y: 72 },
     );
-    get().pushTip("bookmarks", { x: 24, y: 120 });
-    get().pushTip("session_ghosts", { x: 24, y: 160 });
+    get().pushTip("session_ghosts", { x: 280, y: 120 });
   },
 
   jumpBookmark: (slot) => {
@@ -245,7 +244,7 @@ export const useHotkeys = create<HotkeyState>((set, get) => ({
       get().pushToast(
         `Location ${slot} empty`,
         `Ctrl+F${slot} saves your current camera here`,
-        { x: 24, y: 72 },
+        { x: 280, y: 72 },
       );
       return null;
     }
@@ -265,21 +264,29 @@ export const useHotkeys = create<HotkeyState>((set, get) => ({
     if (get().overlays.some((o) => o.kind === "tip" && o.featureId === featureId)) return;
     const seen = { ...get().seenTips, [featureId]: true };
     persistTips(seen);
+    // Safe default: mid-plane, clear of left systems dock
+    const x = screen.x < 240 ? 280 : screen.x;
+    const y = screen.y < 60 ? 72 : screen.y;
     const overlay: CanvasOverlay = {
       id: uid("tip"),
       kind: "tip",
-      x: screen.x,
-      y: screen.y,
+      x,
+      y,
       space: "screen",
       title: tip.title,
       body: tip.body,
       creative: tip.creative,
       featureId,
       createdAt: Date.now(),
-      ttl: 14000,
+      ttl: 12000,
     };
-    set((s) => ({ seenTips: seen, overlays: [...s.overlays, overlay] }));
+    // Only one tip visible at a time — replace prior tip, keep toasts/dialogs
+    set((s) => ({
+      seenTips: seen,
+      overlays: [...s.overlays.filter((o) => o.kind !== "tip"), overlay],
+    }));
   },
+
 
   pushToast: (title, body, screen) => {
     const overlay: CanvasOverlay = {
@@ -401,7 +408,7 @@ export const useHotkeys = create<HotkeyState>((set, get) => ({
     });
     get().pushToast("Hotkey updated", bindingLabel(
       get().bindings.find((b) => b.id === existingId) ?? o.conflict.existing,
-    ), { x: 24, y: 72 });
+    ), { x: 280, y: 72 });
   },
 
   dismissOverlay: (id) => set((s) => ({ overlays: s.overlays.filter((o) => o.id !== id) })),
