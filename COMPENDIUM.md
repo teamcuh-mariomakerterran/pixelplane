@@ -156,7 +156,8 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 - **Plane-fed street decor:** citykit sheets (neon shops, police, towers, alleys…) spawn as billboards around the player on engine enter
 - **Camera shake** on smash/ram; engine chrome shows live rule count
 - **Canvas frustum cull + LOD:** fat city kit boards skip offscreen blits; far zoom solid-proxy; active board pulse glow
-- **Files:** `store/rule-cards.ts`, `lib/rules/engine-bridge.ts`, `lib/city-engine/heat.ts`, `sim.ts`, `CityEngineView.tsx`, `CanvasWorkspace.tsx`, `RuleCardsPanel.tsx`, CommandPalette / SystemsDock / config
+- **Follow-on juice:** day/night ambient grade · foot dust · enter/smash rings · timeline Play path · frame-active-board command
+- **Files:** `store/rule-cards.ts`, `lib/rules/engine-bridge.ts`, `lib/city-engine/heat.ts`, `sim.ts`, `CityEngineView.tsx`, `CanvasWorkspace.tsx`, `RuleCardsPanel.tsx`, CommandPalette / SystemsDock / config / timeline
 - **Audit:** typecheck clean · browser smoke 0 errors · engine enter/smash path clean
 
 ### 2026-08-10 — Goodies wave 8 · Highways · neon shops · police · buses
