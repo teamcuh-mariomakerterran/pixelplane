@@ -30,6 +30,7 @@ import { CommandPalette } from "./CommandPalette";
 import { PaletteGravityBar } from "./PaletteGravityBar";
 import { TimelineStrip } from "./TimelineStrip";
 import { KernelOverlays } from "./KernelOverlays";
+import { RuleCardsPanel } from "./RuleCardsPanel";
 import { useSpatialNav } from "@/store/spatial-nav";
 import { usePlaneSystems } from "@/store/plane-systems";
 import { useMemoryWeb } from "@/store/memory-web";
@@ -366,6 +367,7 @@ function AppModeRoot({ ready }: { ready: boolean }) {
           <PaletteGravityBar />
           <TimelineStrip />
           <KernelOverlays />
+          <RuleCardsPanel />
           <CommandPalette />
           <SharedPlaneHost />
           <SharedPlanePanel />

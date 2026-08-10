@@ -14,6 +14,7 @@ import { useCollab } from "@/store/collab";
 import { useMemoryWeb } from "@/store/memory-web";
 import { useSignature } from "@/store/signature";
 import { useSoundSprites } from "@/store/sound-sprites";
+import { useRuleCards, whenLabel, thenLabel } from "@/store/rule-cards";
 import { compositeLayers, bufferToImageData } from "@/lib/pixel/buffer";
 import { wireZoneHeat, worldCenterFromCamera } from "@/lib/spatial/wave-a";
 import { zoneWorld, padWorld } from "@/lib/character-district/layout";
@@ -533,39 +534,88 @@ export function CanvasWorkspace() {
         }
       }
 
-      // Artboards
-      for (const b of state.artboards) {
-        const active = b.id === state.activeArtboardId;
-        // checkerboard bg
-        const cell = 8;
-        for (let yy = 0; yy < b.height; yy += cell) {
-          for (let xx = 0; xx < b.width; xx += cell) {
-            const on = ((xx / cell) | 0) + ((yy / cell) | 0);
-            ctx.fillStyle = on % 2 === 0 ? "#1a1f2a" : "#141820";
-            ctx.fillRect(
-              b.x + xx,
-              b.y + yy,
-              Math.min(cell, b.width - xx),
-              Math.min(cell, b.height - yy),
+      // Artboards (frustum-culled for fat city kits)
+      {
+        const worldL = -cam.x / cam.zoom - 40;
+        const worldT = -cam.y / cam.zoom - 40;
+        const worldR = (sw - cam.x) / cam.zoom + 40;
+        const worldB = (sh - cam.y) / cam.zoom + 40;
+        const tNow = performance.now();
+        for (const b of state.artboards) {
+          // frustum cull
+          if (
+            b.x + b.width < worldL ||
+            b.y + b.height < worldT ||
+            b.x > worldR ||
+            b.y > worldB
+          ) {
+            continue;
+          }
+          const active = b.id === state.activeArtboardId;
+          // LOD: far zoom = solid color + name only (no full pixel blit)
+          const lodSkip =
+            cam.zoom < 0.12 && b.width * cam.zoom < 48 && !active;
+          if (lodSkip) {
+            ctx.fillStyle = active ? "rgba(232,168,56,0.35)" : "rgba(62,80,100,0.45)";
+            ctx.fillRect(b.x, b.y, b.width, b.height);
+            ctx.strokeStyle = active ? "#e8a838" : "rgba(140,150,170,0.4)";
+            ctx.lineWidth = 1 / cam.zoom;
+            ctx.strokeRect(b.x, b.y, b.width, b.height);
+            continue;
+          }
+          // checkerboard bg (skip when zoomed way out)
+          if (cam.zoom > 0.25) {
+            const cell = 8;
+            for (let yy = 0; yy < b.height; yy += cell) {
+              for (let xx = 0; xx < b.width; xx += cell) {
+                const on = ((xx / cell) | 0) + ((yy / cell) | 0);
+                ctx.fillStyle = on % 2 === 0 ? "#1a1f2a" : "#141820";
+                ctx.fillRect(
+                  b.x + xx,
+                  b.y + yy,
+                  Math.min(cell, b.width - xx),
+                  Math.min(cell, b.height - yy),
+                );
+              }
+            }
+          } else {
+            ctx.fillStyle = "#141820";
+            ctx.fillRect(b.x, b.y, b.width, b.height);
+          }
+          try {
+            const c = getBoardCanvas(b);
+            ctx.drawImage(c, b.x, b.y);
+          } catch {
+            /* ignore */
+          }
+          // active board pulse glow
+          if (active) {
+            const pulse = 0.5 + 0.5 * Math.sin(tNow / 380);
+            ctx.strokeStyle = `rgba(232,168,56,${0.55 + pulse * 0.4})`;
+            ctx.lineWidth = (2 + pulse) / cam.zoom;
+            ctx.strokeRect(
+              b.x - 2 / cam.zoom,
+              b.y - 2 / cam.zoom,
+              b.width + 4 / cam.zoom,
+              b.height + 4 / cam.zoom,
             );
           }
-        }
-        try {
-          const c = getBoardCanvas(b);
-          ctx.drawImage(c, b.x, b.y);
-        } catch {
-          /* ignore */
-        }
-        ctx.strokeStyle = active ? "#e8a838" : "rgba(140,150,170,0.55)";
-        ctx.lineWidth = (active ? 2 : 1) / cam.zoom;
-        ctx.strokeRect(b.x - 0.5 / cam.zoom, b.y - 0.5 / cam.zoom, b.width + 1 / cam.zoom, b.height + 1 / cam.zoom);
-        if (cam.zoom > 0.35) {
-          labels.push({
-            text: b.name,
-            x: cam.x + b.x * cam.zoom,
-            y: cam.y + b.y * cam.zoom - 4,
-            color: active ? "rgba(232,168,56,0.95)" : "rgba(200,210,220,0.7)",
-          });
+          ctx.strokeStyle = active ? "#e8a838" : "rgba(140,150,170,0.55)";
+          ctx.lineWidth = (active ? 2 : 1) / cam.zoom;
+          ctx.strokeRect(
+            b.x - 0.5 / cam.zoom,
+            b.y - 0.5 / cam.zoom,
+            b.width + 1 / cam.zoom,
+            b.height + 1 / cam.zoom,
+          );
+          if (cam.zoom > 0.35) {
+            labels.push({
+              text: b.name,
+              x: cam.x + b.x * cam.zoom,
+              y: cam.y + b.y * cam.zoom - 4,
+              color: active ? "rgba(232,168,56,0.95)" : "rgba(200,210,220,0.7)",
+            });
+          }
         }
       }
 
@@ -951,6 +1001,60 @@ export function CanvasWorkspace() {
               color: "#e9d5ff",
               bg: "rgba(40,20,60,0.75)",
             });
+          }
+        }
+      }
+
+      // Rule cards (sticky logic notes — Layer IV)
+      {
+        const rules = useRuleCards.getState();
+        if (rules.showOnPlane) {
+          const cw = 148;
+          const ch = 78;
+          for (const card of rules.cards) {
+            const active = card.id === rules.activeId;
+            // soft shadow
+            ctx.fillStyle = "rgba(0,0,0,0.35)";
+            ctx.fillRect(card.x + 3 / cam.zoom, card.y + 3 / cam.zoom, cw, ch);
+            // body
+            ctx.fillStyle = card.enabled
+              ? "rgba(18,22,32,0.92)"
+              : "rgba(18,22,32,0.55)";
+            ctx.fillRect(card.x, card.y, cw, ch);
+            // accent strip
+            ctx.fillStyle = hexAlpha(card.color, card.enabled ? 0.95 : 0.4);
+            ctx.fillRect(card.x, card.y, 5, ch);
+            // border
+            ctx.strokeStyle = active
+              ? "#e8a838"
+              : hexAlpha(card.color, card.enabled ? 0.75 : 0.35);
+            ctx.lineWidth = (active ? 2 : 1.25) / cam.zoom;
+            ctx.strokeRect(card.x, card.y, cw, ch);
+            // pin dot
+            ctx.fillStyle = hexAlpha(card.color, 1);
+            ctx.beginPath();
+            ctx.arc(card.x + cw - 10, card.y + 10, 3.5 / cam.zoom, 0, Math.PI * 2);
+            ctx.fill();
+            if (cam.zoom > 0.2) {
+              labels.push({
+                text: card.name + (card.enabled ? "" : " · off"),
+                x: cam.x + (card.x + 10) * cam.zoom,
+                y: cam.y + (card.y + 16) * cam.zoom,
+                color: hexAlpha(card.color, 0.95),
+              });
+              labels.push({
+                text: `WHEN ${whenLabel(card.when)}`,
+                x: cam.x + (card.x + 10) * cam.zoom,
+                y: cam.y + (card.y + 34) * cam.zoom,
+                color: "rgba(200,210,220,0.85)",
+              });
+              labels.push({
+                text: `→ ${thenLabel(card.then).slice(0, 28)}`,
+                x: cam.x + (card.x + 10) * cam.zoom,
+                y: cam.y + (card.y + 50) * cam.zoom,
+                color: "rgba(167,139,250,0.9)",
+              });
+            }
           }
         }
       }

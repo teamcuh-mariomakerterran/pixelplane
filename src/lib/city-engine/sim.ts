@@ -32,6 +32,18 @@ import {
 } from "./quest-runtime";
 import { useMemoryWeb } from "@/store/memory-web";
 import { resolveFootingMove, actorUnderOverhang } from "./footing";
+import {
+  ensureHeatUnits,
+  stepHeat,
+  spawnStreetDecor,
+  wantedStars,
+  type HeatUnit,
+  type StreetDecor,
+} from "./heat";
+import { evalRules, createCooldowns, type RuleCooldowns } from "@/lib/rules/engine-bridge";
+import { useRuleCards } from "@/store/rule-cards";
+import { useSoundSprites } from "@/store/sound-sprites";
+import type { RuleCard } from "@/store/rule-cards";
 
 export type Mode = "foot" | "drive";
 export type Realm = "outdoor" | "indoor";
@@ -44,6 +56,8 @@ export type EntityVehicle = {
   rot: number;
   speed: number;
   traffic: boolean;
+  /** pursuit unit (heat) */
+  heat?: boolean;
 };
 
 export type Player = {
@@ -103,6 +117,16 @@ export type EngineState = {
   /** sub-tile footing colliders from City District */
   footings: import("./footing").FootingInstance[];
   underOverhang: boolean;
+  /** Layer IV — wanted heat pursuit */
+  heatUnits: HeatUnit[];
+  /** Layer IV — plane-fed street decor billboards */
+  decor: StreetDecor[];
+  /** Layer IV — rule card cooldowns */
+  ruleCd: RuleCooldowns;
+  /** last speed mult from rules */
+  ruleSpeedMult: number;
+  /** camera shake remaining (seconds) */
+  shake: number;
 };
 
 export function createEngineState(
@@ -151,6 +175,11 @@ export function createEngineState(
     liveRev: {},
     footings: [],
     underOverhang: false,
+    heatUnits: [],
+    decor: [],
+    ruleCd: createCooldowns(),
+    ruleSpeedMult: 1,
+    shake: 0,
   };
 }
 
@@ -186,6 +215,38 @@ function noteDestroyed(s: EngineState, before: WorldProp[], after: WorldProp[], 
   }
 }
 
+function applyRuleEffect(
+  s: EngineState,
+  effect: ReturnType<typeof evalRules>,
+): boolean {
+  if (effect.status) s.status = effect.status;
+  if (effect.hint) s.interactHint = effect.hint;
+  if (effect.wantedDelta) {
+    s.player.wanted = Math.max(
+      0,
+      Math.min(5, s.player.wanted + effect.wantedDelta),
+    );
+  }
+  if (effect.speedMult) s.ruleSpeedMult = effect.speedMult;
+  return !!effect.playSiren;
+}
+
+function getRuleCards(): RuleCard[] {
+  try {
+    return useRuleCards.getState().cards;
+  } catch {
+    return [];
+  }
+}
+
+function playSirenSafe() {
+  try {
+    useSoundSprites.getState().playKind("siren", 1);
+  } catch {
+    /* ignore */
+  }
+}
+
 export function initIndoors(s: EngineState, extra: IndoorScene[] = []) {
   const builtins = createBuiltinIndoors(s.outdoorW, s.outdoorH);
   const map = new Map<string, IndoorScene>();
@@ -196,6 +257,7 @@ export function initIndoors(s: EngineState, extra: IndoorScene[] = []) {
 
 export function spawnWorldProps(s: EngineState) {
   s.props = spawnStreetProps(s.player.x, s.player.y, s.outdoorW, s.outdoorH);
+  s.decor = spawnStreetDecor(s.player.x, s.player.y, s.outdoorW, s.outdoorH);
 }
 
 export function buildRoadMask(
@@ -211,7 +273,6 @@ export function buildRoadMask(
     const r = d[i * 4]!;
     const g = d[i * 4 + 1]!;
     const b = d[i * 4 + 2]!;
-    // gray asphalt-ish
     const max = Math.max(r, g, b);
     const min = Math.min(r, g, b);
     const sat = max === 0 ? 0 : (max - min) / max;
@@ -238,7 +299,6 @@ export function spawnStarterVehicles(s: EngineState) {
   const cy = s.player.y;
   const defs = VEHICLE_DEFS;
   s.vehicles = [];
-  // player cluster
   for (let i = 0; i < 5; i++) {
     const d = defs[i % defs.length]!;
     s.vehicles.push({
@@ -251,7 +311,6 @@ export function spawnStarterVehicles(s: EngineState) {
       traffic: false,
     });
   }
-  // light traffic ring
   for (let i = 0; i < 10; i++) {
     const d = defs[(i + 3) % defs.length]!;
     const ang = (i / 10) * Math.PI * 2;
@@ -329,11 +388,19 @@ export function trySmash(s: EngineState) {
   const before = s.props.map((x) => ({ ...x }));
   s.props = s.props.map((x) => (x.id === p.id ? damageProp(x, 16) : x));
   s.smashFlash = 0.25;
+  s.shake = Math.max(s.shake, 0.18);
   noteDestroyed(s, before, s.props, p.kind);
   const after = s.props.find((x) => x.id === p.id);
   if (after?.gone) {
     s.player.wanted = Math.min(5, s.player.wanted + 0.35);
-    // Memory web: NPCs in radius remember smash
+    const cards = getRuleCards();
+    const effect = evalRules(cards, { type: "smash" }, s.player.wanted);
+    const siren = applyRuleEffect(s, effect);
+    if (siren && s.t - s.ruleCd.sirenAt > 1.2) {
+      playSirenSafe();
+      s.ruleCd.sirenAt = s.t;
+    }
+    ensureHeatUnits(s);
     try {
       useMemoryWeb.getState().engineSmashAt(p.x + p.w / 2, p.y + p.h / 2, 160);
       s.npcs = s.npcs.map((n) => ({
@@ -344,7 +411,8 @@ export function trySmash(s: EngineState) {
       /* ignore */
     }
     if (!s.quest?.completed) {
-      s.status = `Smashed ${propLabel(p)}! · total ${s.smashCount}`;
+      const stars = wantedStars(s.player.wanted);
+      s.status = `Smashed ${propLabel(p)}! · total ${s.smashCount}${stars ? ` · ★${stars}` : ""}`;
     }
   } else {
     s.status = `Hit ${propLabel(p)} · ${after?.hp ?? 0} HP left`;
@@ -412,6 +480,9 @@ export function tryEnterExit(s: EngineState) {
     s.targetZoom = zoomTargets(s.profile, "drive");
     s.status = `Driving ${defOf(veh.defId).name} · city view`;
     emitQuest(s, { kind: "enter_vehicle", at: s.t });
+    const cards = getRuleCards();
+    const effect = evalRules(cards, { type: "enter_vehicle" }, s.player.wanted);
+    applyRuleEffect(s, effect);
     return;
   }
 
@@ -426,8 +497,30 @@ export function step(s: EngineState, dt: number) {
   s.t += dt;
   const p = s.player;
   s.interactHint = null;
+  s.ruleSpeedMult = 1;
   if (s.smashFlash > 0) s.smashFlash = Math.max(0, s.smashFlash - dt);
+  if (s.shake > 0) s.shake = Math.max(0, s.shake - dt);
   s.props = tickProps(s.props, dt);
+
+  {
+    const cards = getRuleCards();
+    const sprinting = key(s, "ShiftLeft", "ShiftRight");
+    const braking = key(s, "Space");
+    const effect = evalRules(
+      cards,
+      { type: "tick", wanted: p.wanted, sprinting, braking },
+      p.wanted,
+    );
+    const siren = applyRuleEffect(s, effect);
+    if (siren) {
+      const stars = wantedStars(p.wanted);
+      if (stars > s.ruleCd.wantedSirenLevel || s.t - s.ruleCd.sirenAt > 4) {
+        playSirenSafe();
+        s.ruleCd.sirenAt = s.t;
+        s.ruleCd.wantedSirenLevel = stars;
+      }
+    }
+  }
 
   if (s.realm === "indoor" && s.indoor) {
     p.mode = "foot";
@@ -442,7 +535,10 @@ export function step(s: EngineState, dt: number) {
       const len = Math.hypot(mx, my) || 1;
       mx /= len;
       my /= len;
-      const spd = ENGINE.footSpeed * (key(s, "ShiftLeft", "ShiftRight") ? 1.55 : 1);
+      const spd =
+        ENGINE.footSpeed *
+        (key(s, "ShiftLeft", "ShiftRight") ? 1.55 : 1) *
+        s.ruleSpeedMult;
       const nx = p.x + mx * spd * dt;
       const ny = p.y + my * spd * dt;
       if (!indoorSolidAt(s.indoor, nx, p.y)) p.x = nx;
@@ -459,7 +555,6 @@ export function step(s: EngineState, dt: number) {
     return;
   }
 
-  // outdoor foot
   if (p.mode === "foot") {
     let mx = 0,
       my = 0;
@@ -471,10 +566,12 @@ export function step(s: EngineState, dt: number) {
       const len = Math.hypot(mx, my) || 1;
       mx /= len;
       my /= len;
-      const spd = ENGINE.footSpeed * (key(s, "ShiftLeft", "ShiftRight") ? 1.55 : 1);
+      const spd =
+        ENGINE.footSpeed *
+        (key(s, "ShiftLeft", "ShiftRight") ? 1.55 : 1) *
+        s.ruleSpeedMult;
       const dx = mx * spd * dt;
       const dy = my * spd * dt;
-      // Sub-tile footing only (not full tile) — walk under awnings
       if (s.footings.length) {
         const res = resolveFootingMove(p.x, p.y, 14, 14, dx, dy, s.footings);
         p.x = res.x;
@@ -485,7 +582,6 @@ export function step(s: EngineState, dt: number) {
       }
       p.rot = Math.atan2(my, mx);
     }
-    // overhang z-hint for renderer
     s.underOverhang = s.footings.some((f) => actorUnderOverhang(p.x, p.y, f));
     const veh = nearestVehicle(s);
     const door = nearestExteriorDoor(s.indoorScenes, p.x, p.y, ENGINE.doorRadius);
@@ -498,12 +594,14 @@ export function step(s: EngineState, dt: number) {
     if (near && !s.interactHint) s.interactHint = `F · Smash ${propLabel(near)}`;
   }
 
-  // drive
   if (p.mode === "drive" && p.vehicleId) {
     const v = s.vehicles.find((x) => x.id === p.vehicleId);
     if (v) {
       const d = defOf(v.defId);
-      const max = d.maxSpeed * (key(s, "ShiftLeft", "ShiftRight") ? 1.15 : 1);
+      const max =
+        d.maxSpeed *
+        (key(s, "ShiftLeft", "ShiftRight") ? 1.15 : 1) *
+        s.ruleSpeedMult;
       if (key(s, "KeyW", "ArrowUp")) v.speed += ENGINE.driveAccel * dt;
       if (key(s, "KeyS", "ArrowDown")) v.speed -= ENGINE.driveAccel * 0.7 * dt;
       if (key(s, "Space")) {
@@ -527,15 +625,19 @@ export function step(s: EngineState, dt: number) {
         v.speed *= 0.4;
         if (Math.abs(v.speed) > 40) p.wanted = Math.min(5, p.wanted + 0.15);
       }
-      // ram props
       const before = s.props.map((x) => ({ ...x }));
       const ram = vehicleHitsProp(s.props, v.x, v.y, v.speed);
       s.props = ram.props;
       if (ram.hit) {
         s.smashFlash = 0.2;
+        s.shake = Math.max(s.shake, 0.12);
         p.wanted = Math.min(5, p.wanted + 0.08);
         v.speed *= 0.85;
         noteDestroyed(s, before, s.props);
+        const cards = getRuleCards();
+        const effect = evalRules(cards, { type: "smash" }, p.wanted);
+        applyRuleEffect(s, effect);
+        ensureHeatUnits(s);
       }
       p.x = v.x;
       p.y = v.y;
@@ -545,6 +647,7 @@ export function step(s: EngineState, dt: number) {
 
   for (const v of s.vehicles) {
     if (!v.traffic || v.id === p.vehicleId) continue;
+    if (s.heatUnits.some((h) => h.vehicleId === v.id)) continue;
     const d = defOf(v.defId);
     v.speed = Math.min(d.maxSpeed * 0.35, v.speed + 20 * dt);
     const nx = v.x + Math.cos(v.rot) * v.speed * dt;
@@ -561,6 +664,9 @@ export function step(s: EngineState, dt: number) {
     if (v.x > s.worldW) v.x = 0;
     if (v.y > s.worldH) v.y = 0;
   }
+
+  ensureHeatUnits(s);
+  stepHeat(s, dt);
 
   p.wanted = Math.max(0, p.wanted - ENGINE.wantedDecay * dt);
   s.targetZoom =
@@ -583,7 +689,6 @@ export function vehicleDef(id: string) {
   return defOf(id);
 }
 
-/** Load NPCs from memory web into engine world positions */
 export function syncNpcsFromMemory(s: EngineState) {
   const web = useMemoryWeb.getState().web;
   s.npcs = web.agents
@@ -599,3 +704,4 @@ export function syncNpcsFromMemory(s: EngineState) {
     }));
 }
 
+export { wantedStars };

@@ -63,10 +63,11 @@ export const CONTROLS_HELP = [
   "WASD / arrows — move or steer",
   "E / Enter — vehicle · building door · exit indoor",
   "F — smash nearest crate/barrel (or ram while driving)",
-  "Shift — sprint (foot) / boost (drive)",
+  "Shift — sprint (foot) / boost (drive) · rule cards can amplify",
   "Space — brake",
   "Esc — back to Studio",
   "M — toggle minimap",
-  "Studio quest trees auto-load as Active Quest (smash advances)",
+  "Smash / ram builds ★ wanted · heat units pursue",
+  "Studio quest trees + rule cards auto-load into engine",
   "Perspective profile: top-down open world (template ladder growing)",
 ].join("\n");

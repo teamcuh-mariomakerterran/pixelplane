@@ -17,7 +17,9 @@ import {
   Orbit,
   Lamp,
   GitBranch,
+  ScrollText,
 } from "lucide-react";
+import { useRuleCards } from "@/store/rule-cards";
 import { cn } from "@/lib/utils";
 
 /**
@@ -39,6 +41,8 @@ export function SystemsDock() {
   const orbitOn = useSignature((s) => s.orbitEnabled);
   const orbitN = useSignature((s) => s.orbitPins.length);
   const diffOn = useSignature((s) => s.diffEnabled);
+  const ruleN = useRuleCards((s) => s.cards.length);
+  const rulesShow = useRuleCards((s) => s.showOnPlane);
 
   return (
     <div className="pointer-events-none absolute left-2 top-14 z-[45] flex max-w-[220px] flex-col gap-1.5">
@@ -163,6 +167,25 @@ export function SystemsDock() {
             onClick={() => useSignature.getState().spawnMutationRails()}
           >
             <GitBranch size={12} /> Mutate
+          </DockBtn>
+          <DockBtn
+            active={rulesShow && ruleN > 0}
+            title="Rule cards — sticky WHEN→THEN logic · seed Street Heat deck"
+            onClick={() => {
+              const r = useRuleCards.getState();
+              if (!r.cards.length) {
+                r.seedStreetHeatDeck();
+                useStudio.getState().setStatus("Street Heat rule deck seeded");
+                return;
+              }
+              const next = !r.showOnPlane;
+              r.setShowOnPlane(next);
+              useStudio
+                .getState()
+                .setStatus(next ? "Rule cards visible" : "Rule cards hidden");
+            }}
+          >
+            <ScrollText size={12} /> Rules {ruleN || ""}
           </DockBtn>
         </div>
         <div className="mt-1 px-1 text-[9px] text-subtle">

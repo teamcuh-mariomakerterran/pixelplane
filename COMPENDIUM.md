@@ -150,6 +150,15 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 
 ## 3. Changelog (newest first)
 
+### 2026-08-10 — Holy Shit Layer IV (Law & Logic · engine + canvas)
+- **Rule Cards (§6.6):** sticky WHEN→THEN logic on the plane; Street Heat seed deck (6 cards); export `pixelplane_rule_cards.json` input map; Systems dock + Ctrl+K; live evaluation in City Engine (smash heat, sirens, sprint boost, status/hints)
+- **Wanted stars + heat pursuit:** smash/ram builds ★0–5; pursuit sedans chase player; minimap heat blips; red edge pulse + siren chips; HUD star row
+- **Plane-fed street decor:** citykit sheets (neon shops, police, towers, alleys…) spawn as billboards around the player on engine enter
+- **Camera shake** on smash/ram; engine chrome shows live rule count
+- **Canvas frustum cull + LOD:** fat city kit boards skip offscreen blits; far zoom solid-proxy; active board pulse glow
+- **Files:** `store/rule-cards.ts`, `lib/rules/engine-bridge.ts`, `lib/city-engine/heat.ts`, `sim.ts`, `CityEngineView.tsx`, `CanvasWorkspace.tsx`, `RuleCardsPanel.tsx`, CommandPalette / SystemsDock / config
+- **Audit:** typecheck clean · browser smoke 0 errors · engine enter/smash path clean
+
 ### 2026-08-10 — Goodies wave 8 · Highways · neon shops · police · buses
 - **+24 sheets (139 citykit total):** elevated highway kit, neon storefronts (hotel/bar/cyberdeck/club), police fleet damage, bus clean→burned, van damage, cyber trucks, armed color/dark cars, purple neon apts, neon alleys, color industrial plants, big-box stores, airport hangars, dark fortresses, modular base shapes
 - **Ctrl+K → city kit** dumps all 139
@@ -525,13 +534,14 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 | Mutation rails | **NOT STARTED** | — | §6.3 |
 | Palette gravity | **NOT STARTED** | — | §6.4 |
 | Sound-as-sprite | **NOT STARTED** | — | §6.5 |
-| Rule cards | **NOT STARTED** | — | §6.6 |
-| Diff lantern | **NOT STARTED** | — | §6.7 |
+| Rule cards | **SHIPPED** | sticky WHEN→THEN · engine live · export JSON | §6.6 |
+| Diff lantern | **SHIPPED** | nearest-neighbor compare + hot overlay | §6.7 |
 | Session ghosts | **SHIPPED** | F-key thumbs · plane ghosts · toggle | §6.8 |
-| Play kernels (beyond solitaire) | **NOT STARTED** | Solitaire is v0 kernel | §6.9 |
-| Reference orbit | **NOT STARTED** | — | §6.10 |
+| Play kernels (beyond solitaire) | **SHIPPED lite** | Inventory · Leads · Brew | §6.9 |
+| Reference orbit | **SHIPPED** | screen-space satellite cards + tethers | §6.10 |
 | Constraint stamps | **SHIPPED** | tool N · pixel cages · active clamp-ready | §6.11 |
 | Wire heat map | **SHIPPED** | Plane systems toggle · zone glow | §6.12 |
+| Engine heat / wanted | **SHIPPED** | stars · pursuit · decor from packs | Layer IV |
 
 **Policy:** No silent half-features. If incomplete, it is listed here with a path and next step.
 
@@ -574,7 +584,7 @@ Brian’s directive (2026-08-01): **do not pick only a few** — implement the f
 ### 6.6 Rule cards
 - **Idea:** Sticky logic cards (“Space → Walk”); export stub scripts / input map.
 - **Data:** `RuleCard { when, then, links[] }` DSL (intentionally small).
-- **Status:** Planned
+- **Status:** Shipped (Layer IV) — plane cards + Street Heat deck + engine live eval + JSON export
 
 ### 6.7 Diff lantern
 - **Idea:** Compare two boards; lantern shows only differing pixels.
@@ -632,8 +642,9 @@ Brian’s directive (2026-08-01): **do not pick only a few** — implement the f
 | Item | Owner | State |
 |------|-------|-------|
 | Live compendium + handoff discipline | Grok + Brian | **Active (this file)** |
-| Wave A signature features | Grok | **Shipped (canvas + toolbar + dock)** |
-| Hands-on playtest feedback | Brian | **Imminent (post-work)** |
+| Wave A–C + Layer IV signature features | Grok | **Shipped (rules · heat · cull)** |
+| Engine list from Brian (phone / co-pilot) | Brian | **Compiling at work** |
+| Hands-on playtest feedback | Brian | **Post-shift** |
 
 ---
 

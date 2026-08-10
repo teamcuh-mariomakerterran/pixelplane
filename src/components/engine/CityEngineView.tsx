@@ -12,6 +12,7 @@ import {
   initIndoors,
   setQuestRuntime,
   syncNpcsFromMemory,
+  wantedStars,
   type EngineState,
 } from "@/lib/city-engine/sim";
 import { propLabel } from "@/lib/city-engine/world-props";
@@ -33,18 +34,19 @@ import { useMemoryWeb } from "@/store/memory-web";
 import { useCharacterDistrict } from "@/store/character-district";
 import { useStudio } from "@/store/studio";
 import { useSignature } from "@/store/signature";
+import { useRuleCards } from "@/store/rule-cards";
 import { compositeLayers } from "@/lib/pixel/buffer";
 import { FX_EXPLOSIONS } from "@/lib/icon-library/pixel-packs";
-import { ArrowLeft, Crosshair, Car, Building2, ScrollText, Ghost } from "lucide-react";
+import { ArrowLeft, Crosshair, Car, Building2, ScrollText, Ghost, Star } from "lucide-react";
 
 /**
  * PixelPlane City Engine — original top-down sandbox.
  * Birthplace of the full engine: modular perspective + quest contracts.
  * Play Ghost: session path drops onto Studio plane when you leave.
+ * Layer IV: wanted stars · heat pursuit · plane-fed decor · camera shake.
  */
 export function CityEngineView() {
   const leave = () => {
-    // drop play ghost onto plane before exit
     const tr = traceRef.current;
     if (tr && tr.samples.length > 4) {
       const s = stateRef.current;
@@ -64,11 +66,14 @@ export function CityEngineView() {
   const vehImg = useRef<HTMLImageElement | null>(null);
   const boomFrames = useRef<HTMLImageElement[]>([]);
   const heroImg = useRef<HTMLImageElement | null>(null);
+  const decorImgs = useRef<Map<string, HTMLImageElement>>(new Map());
   const [hud, setHud] = useState({
     status: "",
     mode: "foot",
     realm: "outdoor",
     wanted: 0,
+    stars: 0,
+    heat: 0,
     speed: 0,
     hint: "" as string | null,
     indoorName: "",
@@ -76,6 +81,7 @@ export function CityEngineView() {
     smashCount: 0,
     profile: "Top-down open world",
     questDone: false,
+    rules: 0,
   });
   const [ready, setReady] = useState(false);
 
@@ -121,7 +127,6 @@ export function CityEngineView() {
       s.player.x = s.worldW * 0.48;
       s.player.y = s.worldH * 0.52;
 
-      // road mask
       const c = document.createElement("canvas");
       c.width = map.naturalWidth;
       c.height = map.naturalHeight;
@@ -135,7 +140,6 @@ export function CityEngineView() {
       s.mapReady = true;
       s.outdoorW = s.worldW;
       s.outdoorH = s.worldH;
-      // Studio indoor artboards → enterable interiors
       const studio = useStudio.getState();
       const extras = studio.artboards
         .filter((b) => b.kind === "indoor")
@@ -165,16 +169,22 @@ export function CityEngineView() {
       }
       spawnStarterVehicles(s);
       spawnWorldProps(s);
-      // Memory web NPCs into the city
+      // preload decor images from plane packs
+      for (const d of s.decor) {
+        if (!decorImgs.current.has(d.url)) {
+          const im = new Image();
+          im.crossOrigin = "anonymous";
+          im.src = d.url;
+          decorImgs.current.set(d.url, im);
+        }
+      }
       syncNpcsFromMemory(s);
-      // City District footings (Studio-authored) → engine collision
       try {
         const { useCityDistrict } = await import("@/store/city-district");
         const ft = useCityDistrict.getState().footings;
         if (ft.length) {
           s.footings = ft;
         } else {
-          // demo awnings near player if none authored
           const { seedFootingDefs, placeFooting } = await import(
             "@/lib/city-engine/footing"
           );
@@ -193,16 +203,18 @@ export function CityEngineView() {
       } catch {
         /* ignore */
       }
-      // Live sockets: ensure we have some bindings
       if (useMemoryWeb.getState().sockets.length === 0) {
         useMemoryWeb.getState().rebuildSocketsFromWires();
       }
-      // Studio quest trees → live mission contract
       const tree = pickPrimaryQuest(studio.questTrees);
       if (tree) {
         setQuestRuntime(s, questTreeToRuntime(tree));
       } else {
-        s.status = "Street · E doors/cars · F smash · no Studio quest wired yet";
+        s.status = "Street · E doors/cars · F smash · smash builds heat ★";
+      }
+      // auto-seed rule deck if empty so engine has living contracts
+      if (useRuleCards.getState().cards.length === 0) {
+        useRuleCards.getState().seedStreetHeatDeck();
       }
       setReady(true);
     };
@@ -262,7 +274,6 @@ export function CityEngineView() {
       last = now;
       const s = stateRef.current;
       step(s, dt);
-      // Live asset sockets poll (~2Hz)
       if (Math.floor(s.t * 2) !== Math.floor((s.t - dt) * 2)) {
         const payloads = useMemoryWeb.getState().pollSockets();
         for (const p of payloads) {
@@ -271,7 +282,6 @@ export function CityEngineView() {
             s.status = `Live socket · ${p.engineKey} r${p.rev}`;
           }
         }
-        // D_Debug ghost pulse → Studio state pads
         const speed =
           s.player.mode === "drive"
             ? Math.abs(
@@ -290,7 +300,6 @@ export function CityEngineView() {
           t: s.t,
         });
       }
-      // Play Ghost sample
       {
         const mode =
           s.realm === "indoor"
@@ -317,13 +326,21 @@ export function CityEngineView() {
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.imageSmoothingEnabled = false;
 
-      // clear
       ctx.fillStyle = "#0a0c10";
       ctx.fillRect(0, 0, w, h);
 
+      // camera shake
+      let shakeX = 0;
+      let shakeY = 0;
+      if (s.shake > 0) {
+        const mag = s.shake * 10;
+        shakeX = (Math.random() - 0.5) * mag;
+        shakeY = (Math.random() - 0.5) * mag;
+      }
+
       const z = s.camZoom;
-      const ox = w / 2 - s.camX * z;
-      const oy = h / 2 - s.camY * z;
+      const ox = w / 2 - s.camX * z + shakeX;
+      const oy = h / 2 - s.camY * z + shakeY;
 
       if (s.realm === "outdoor" && mapImg.current) {
         ctx.save();
@@ -350,8 +367,30 @@ export function CityEngineView() {
         ctx.restore();
       }
 
-      // street smashables
       if (s.realm === "outdoor") {
+        // plane-fed street decor (billboards)
+        for (const d of s.decor) {
+          const dx = ox + d.x * z;
+          const dy = oy + d.y * z;
+          const dw = d.w * z;
+          const dh = d.h * z;
+          // frustum skip
+          if (dx + dw < 0 || dy + dh < 0 || dx > w || dy > h) continue;
+          const im = decorImgs.current.get(d.url);
+          ctx.fillStyle = "rgba(0,0,0,0.35)";
+          ctx.fillRect(dx - 2, dy - 2, dw + 4, dh + 4);
+          if (im && im.complete && im.naturalWidth > 0) {
+            ctx.imageSmoothingEnabled = false;
+            ctx.drawImage(im, dx, dy, dw, dh);
+          } else {
+            ctx.fillStyle = "rgba(62,207,207,0.25)";
+            ctx.fillRect(dx, dy, dw, dh);
+          }
+          ctx.strokeStyle = "rgba(232,168,56,0.55)";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(dx, dy, dw, dh);
+        }
+
         for (const p of s.props) {
           if (p.gone && p.debrisT <= 0) continue;
           const px = ox + (p.x + p.w / 2) * z;
@@ -359,7 +398,6 @@ export function CityEngineView() {
           const pw = p.w * z;
           const ph = p.h * z;
           if (p.gone) {
-            // Brian explosion sheet — frame by debris timer
             const frames = boomFrames.current;
             const fi = Math.min(
               frames.length - 1,
@@ -396,10 +434,19 @@ export function CityEngineView() {
         }
 
         for (const v of s.vehicles) {
-          drawVehicle(ctx, v, ox, oy, z, vehImg.current, s.player.vehicleId);
+          const isHeat = s.heatUnits.some((h) => h.vehicleId === v.id);
+          drawVehicle(
+            ctx,
+            v,
+            ox,
+            oy,
+            z,
+            vehImg.current,
+            s.player.vehicleId,
+            isHeat,
+          );
         }
 
-        // door markers
         for (const sc of s.indoorScenes) {
           for (const d of sc.exteriorDoors) {
             const dx = ox + d.x * z;
@@ -414,7 +461,6 @@ export function CityEngineView() {
           }
         }
 
-        // Memory-web NPCs
         for (const n of s.npcs) {
           const nx = ox + n.x * z;
           const ny = oy + n.y * z;
@@ -437,12 +483,10 @@ export function CityEngineView() {
         }
       }
 
-      // City District footings: solid footing + overhang (draws after player if under)
       const under = s.underOverhang;
       for (const f of s.footings) {
         const fx = ox + f.x * z;
         const fy = oy + f.y * z;
-        // body (building mass above footing)
         if (f.def.overhangH > 0) {
           ctx.fillStyle = under
             ? "rgba(180,83,9,0.35)"
@@ -454,7 +498,6 @@ export function CityEngineView() {
             f.def.overhangH * z,
           );
         }
-        // footing strip (collision)
         ctx.fillStyle = "rgba(78,203,113,0.5)";
         ctx.fillRect(
           fx + f.def.footX * z,
@@ -464,7 +507,6 @@ export function CityEngineView() {
         );
       }
 
-      // player — Night District hero when equipped
       {
         const px = ox + s.player.x * z;
         const py = oy + s.player.y * z;
@@ -481,7 +523,6 @@ export function CityEngineView() {
             ctx.imageSmoothingEnabled = false;
             ctx.drawImage(heroImg.current!, -hs / 2, -hs * 0.75, hs, hs);
             ctx.restore();
-            // ground shadow
             ctx.fillStyle = "rgba(0,0,0,0.35)";
             ctx.beginPath();
             ctx.ellipse(px, py + 4 * z, 8 * z, 3 * z, 0, 0, Math.PI * 2);
@@ -503,7 +544,6 @@ export function CityEngineView() {
         }
       }
 
-      // overhang re-draw when under so roof appears above player
       if (under) {
         for (const f of s.footings) {
           if (!f.def.walkUnder || f.def.overhangH <= 0) continue;
@@ -519,13 +559,20 @@ export function CityEngineView() {
         }
       }
 
-      // smash screen punch
       if (s.smashFlash > 0) {
         ctx.fillStyle = `rgba(255,120,40,${s.smashFlash * 0.25})`;
         ctx.fillRect(0, 0, w, h);
       }
 
-      // minimap
+      // heat red edge pulse
+      const stars = wantedStars(s.player.wanted);
+      if (stars > 0) {
+        const pulse = 0.5 + 0.5 * Math.sin(s.t * 6);
+        ctx.strokeStyle = `rgba(239,68,68,${0.15 + stars * 0.08 * pulse})`;
+        ctx.lineWidth = 2 + stars;
+        ctx.strokeRect(4, 4, w - 8, h - 8);
+      }
+
       if (s.showMinimap && s.realm === "outdoor" && mapImg.current) {
         const mw = 140;
         const mh = 140;
@@ -540,9 +587,17 @@ export function CityEngineView() {
         ctx.beginPath();
         ctx.arc(pmx, pmy, 3, 0, Math.PI * 2);
         ctx.fill();
+        // heat blips
+        for (const u of s.heatUnits) {
+          const hv = s.vehicles.find((v) => v.id === u.vehicleId);
+          if (!hv) continue;
+          const hx = mx0 + (hv.x / s.outdoorW) * mw;
+          const hy = my0 + (hv.y / s.outdoorH) * mh;
+          ctx.fillStyle = "#ef4444";
+          ctx.fillRect(hx - 1.5, hy - 1.5, 3, 3);
+        }
       }
 
-      // vignette
       const g = ctx.createRadialGradient(w / 2, h / 2, h * 0.2, w / 2, h / 2, h * 0.75);
       g.addColorStop(0, "rgba(0,0,0,0)");
       g.addColorStop(1, "rgba(0,0,0,0.35)");
@@ -562,6 +617,8 @@ export function CityEngineView() {
           mode: s.player.mode,
           realm: s.realm,
           wanted: s.player.wanted,
+          stars: wantedStars(s.player.wanted),
+          heat: s.heatUnits.length,
           speed,
           hint: s.interactHint,
           indoorName: s.indoor?.scene.name ?? "",
@@ -569,6 +626,7 @@ export function CityEngineView() {
           smashCount: s.smashCount,
           profile: s.profile.label,
           questDone: !!s.quest?.completed,
+          rules: useRuleCards.getState().cards.filter((c) => c.enabled).length,
         });
       }
     };
@@ -580,7 +638,6 @@ export function CityEngineView() {
     <div className="relative h-dvh w-full overflow-hidden bg-black">
       <canvas ref={canvasRef} className="h-full w-full touch-none" />
 
-      {/* chrome */}
       <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between p-3">
         <div className="pointer-events-auto flex items-center gap-2">
           <button
@@ -595,7 +652,7 @@ export function CityEngineView() {
               City Engine · Birthplace
             </div>
             <div className="text-[10px] text-cyan-300/80">
-              {hud.profile} · freestyle era · ghost trail on exit
+              {hud.profile} · Layer IV heat · {hud.rules} rules live
             </div>
           </div>
           <div className="flex items-center gap-1 rounded-md border border-violet-500/30 bg-black/55 px-2 py-1 text-[10px] text-violet-200 backdrop-blur">
@@ -626,14 +683,29 @@ export function CityEngineView() {
                 ? `${Math.round(hud.speed)} u/s · city cam`
                 : "walk · street cam"}
           </div>
-          {hud.wanted > 0.2 && (
-            <div className="text-[10px] text-red-400">wanted {hud.wanted.toFixed(1)}</div>
+          {/* Wanted stars */}
+          <div className="mt-1 flex items-center justify-end gap-0.5">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <Star
+                key={i}
+                size={12}
+                className={
+                  i < hud.stars
+                    ? "fill-red-500 text-red-500"
+                    : "text-white/20"
+                }
+              />
+            ))}
+          </div>
+          {hud.heat > 0 && (
+            <div className="text-[10px] text-red-400">
+              {hud.heat} unit{hud.heat > 1 ? "s" : ""} pursuing
+            </div>
           )}
           <div className="text-[10px] text-white/45">smashed {hud.smashCount}</div>
         </div>
       </div>
 
-      {/* Quest contract HUD — Studio tree → play */}
       {hud.quest && (
         <div
           className={`pointer-events-none absolute left-3 top-16 max-w-xs rounded-md border px-3 py-2 backdrop-blur ${
@@ -647,7 +719,7 @@ export function CityEngineView() {
           </div>
           <div className="text-xs text-white/90">{hud.quest}</div>
           <div className="mt-1 text-[9px] text-white/45">
-            Wired from Studio plane · smash (F) / ram advances objectives
+            Wired from Studio plane · smash (F) / ram advances · heat from rules
           </div>
         </div>
       )}
@@ -674,12 +746,13 @@ export function CityEngineView() {
 
 function drawVehicle(
   ctx: CanvasRenderingContext2D,
-  v: { defId: string; x: number; y: number; rot: number; id?: string },
+  v: { defId: string; x: number; y: number; rot: number; id?: string; heat?: boolean },
   ox: number,
   oy: number,
   z: number,
   sheet: HTMLImageElement | null,
   activeId: string | null,
+  isHeat = false,
 ) {
   const def = vehicleDef(v.defId);
   const x = ox + v.x * z;
@@ -696,27 +769,32 @@ function drawVehicle(
     ctx.ellipse(0, 0, dw * 0.7, dh * 0.85, 0, 0, Math.PI * 2);
     ctx.fill();
   }
+  if (isHeat) {
+    ctx.fillStyle = "rgba(239,68,68,0.35)";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, dw * 0.75, dh * 0.9, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
   if (sheet && sheet.complete && sheet.naturalWidth > 0) {
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(
-      sheet,
-      def.sx,
-      def.sy,
-      def.sw,
-      def.sh,
-      -dw / 2,
-      -dh / 2,
-      dw,
-      dh,
-    );
+    ctx.drawImage(sheet, def.sx, def.sy, def.sw, def.sh, -dw / 2, -dh / 2, dw, dh);
   } else {
-    ctx.fillStyle = def.color;
+    ctx.fillStyle = isHeat ? "#ef4444" : def.color;
     ctx.fillRect(-dw / 2, -dh / 2, dw, dh);
-    ctx.fillStyle = "#222";
-    ctx.fillRect(dw * 0.15, -dh * 0.25, dw * 0.25, dh * 0.5);
   }
-  ctx.strokeStyle = active ? "#e8a838" : "rgba(0,0,0,0.65)";
-  ctx.lineWidth = active ? 2.5 : 1.25;
-  ctx.strokeRect(-dw / 2, -dh / 2, dw, dh);
+  if (isHeat) {
+    // light bar
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    ctx.fillRect(-6, -dh / 2 - 3, 12, 3);
+    ctx.fillStyle = Math.floor(performance.now() / 120) % 2 ? "#3b82f6" : "#ef4444";
+    ctx.fillRect(-8, -dh / 2 - 4, 4, 4);
+    ctx.fillStyle = Math.floor(performance.now() / 120) % 2 ? "#ef4444" : "#3b82f6";
+    ctx.fillRect(4, -dh / 2 - 4, 4, 4);
+  }
   ctx.restore();
 }
+
+// silence unused import lint for VEHICLE_DEFS if tree-shaken differently
+void VEHICLE_DEFS;
+void propLabel;
+void nearestVehicle;

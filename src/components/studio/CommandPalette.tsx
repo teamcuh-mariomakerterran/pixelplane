@@ -16,6 +16,7 @@ import { stampTimeline } from "@/store/timeline";
 import { useKernels } from "@/store/kernels";
 import { useSoundSprites } from "@/store/sound-sprites";
 import { useTimeline } from "@/store/timeline";
+import { useRuleCards } from "@/store/rule-cards";
 import { pickSnapshot, saveSnapshot } from "@/lib/pixel/persist";
 import { Keyboard } from "lucide-react";
 
@@ -236,6 +237,50 @@ export function CommandPalette() {
         label: "Stamp timeline moment",
         keywords: "timeline living collage stamp",
         run: () => useTimeline.getState().stamp("Manual mark"),
+      },
+      {
+        id: "ruleseed",
+        group: "Signature",
+        label: "Seed Street Heat rule deck",
+        hint: "6 WHEN→THEN cards · live in engine",
+        keywords: "rule cards logic when then input map street heat",
+        run: () => useRuleCards.getState().seedStreetHeatDeck(),
+      },
+      {
+        id: "ruleadd",
+        group: "Signature",
+        label: "Add rule card",
+        keywords: "rule card add sticky logic",
+        run: () => useRuleCards.getState().placeCard(),
+      },
+      {
+        id: "ruleexport",
+        group: "Signature",
+        label: "Export rule cards JSON",
+        keywords: "rule export input map json",
+        run: () => {
+          const json = useRuleCards.getState().exportInputMapJson();
+          const blob = new Blob([json], { type: "application/json" });
+          const a = document.createElement("a");
+          a.href = URL.createObjectURL(blob);
+          a.download = "pixelplane_rule_cards.json";
+          a.click();
+          useStudio.getState().setStatus("Exported rule cards JSON");
+        },
+      },
+      {
+        id: "ruletoggle",
+        group: "Signature",
+        label: "Toggle rule cards on plane",
+        keywords: "rule cards show hide plane",
+        run: () => {
+          const s = useRuleCards.getState();
+          const next = !s.showOnPlane;
+          s.setShowOnPlane(next);
+          useStudio
+            .getState()
+            .setStatus(next ? "Rule cards visible" : "Rule cards hidden");
+        },
       },
       {
         id: "nighthero",
