@@ -15,7 +15,7 @@ import { useMemoryWeb } from "@/store/memory-web";
 import { useSignature } from "@/store/signature";
 import { useSoundSprites } from "@/store/sound-sprites";
 import { useRuleCards, whenLabel, thenLabel } from "@/store/rule-cards";
-import { compositeLayers, bufferToImageData } from "@/lib/pixel/buffer";
+import { compositeLayers, bufferToImageData, coercePixelData, isBufferHollow } from "@/lib/pixel/buffer";
 import { wireZoneHeat, worldCenterFromCamera } from "@/lib/spatial/wave-a";
 import { zoneWorld, padWorld } from "@/lib/character-district/layout";
 import { CHUNK } from "@/lib/spatial/interest";
@@ -74,6 +74,38 @@ function hexAlpha(hex: string, a: number) {
 const boardCache = new Map<string, { rev: string; canvas: HTMLCanvasElement }>();
 const animCache = new Map<string, { key: string; canvas: HTMLCanvasElement }>();
 const ghostImgCache = new Map<string, HTMLImageElement>();
+const layerDataCache = new Map<string, { rev: number; canvas: HTMLCanvasElement }>();
+
+/** Clear blit caches (call after factory reset / rehydrate). */
+export function clearPlaneBlitCaches() {
+  boardCache.clear();
+  animCache.clear();
+  layerDataCache.clear();
+}
+
+function getLayerDataCanvas(
+  id: string,
+  data: unknown,
+  w: number,
+  h: number,
+  rev = 1,
+): HTMLCanvasElement | null {
+  if (!w || !h) return null;
+  const hit = layerDataCache.get(id);
+  if (hit && hit.rev === rev) return hit.canvas;
+  try {
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext("2d")!;
+    ctx.imageSmoothingEnabled = false;
+    ctx.putImageData(bufferToImageData(coercePixelData(data, w, h), w, h), 0, 0);
+    layerDataCache.set(id, { rev, canvas: c });
+    return c;
+  } catch {
+    return null;
+  }
+}
 
 function boardRevKey(b: {
   id: string;
@@ -486,50 +518,74 @@ export function CanvasWorkspace() {
         }
       }
 
-      // Parallax stacks
+      // Parallax stacks — draw real layer pixels (artboard link OR embedded buffer)
       for (const px of state.parallaxStacks) {
         ctx.save();
         ctx.beginPath();
         ctx.rect(px.x, px.y, px.viewW, px.viewH);
         ctx.clip();
-        ctx.fillStyle = "rgba(20,24,40,0.85)";
+        ctx.fillStyle = "rgba(12,16,28,0.95)";
         ctx.fillRect(px.x, px.y, px.viewW, px.viewH);
         const t = Date.now() / 1000;
+        let drew = 0;
         for (const L of px.layers) {
           if (L.visible === false) continue;
           const board = L.artboardId
             ? state.artboards.find((b) => b.id === L.artboardId)
             : null;
-          const scrollX = (L.scrollScaleX ?? L.depth ?? L.speedX ?? 0.5) * (px.autoPreview ? t * 40 : 0);
-          const scrollY = (L.scrollScaleY ?? L.depth ?? L.speedY ?? 0.5) * (px.autoPreview ? t * 10 : 0);
+          const scrollX =
+            (L.scrollScaleX ?? L.depth ?? L.speedX ?? 0.5) * (px.autoPreview !== false ? t * 28 : 0);
+          const scrollY =
+            (L.scrollScaleY ?? L.depth ?? L.speedY ?? 0.5) * (px.autoPreview !== false ? t * 8 : 0);
+          let c: HTMLCanvasElement | null = null;
+          let lw = 0;
+          let lh = 0;
           if (board) {
-            const c = getBoardCanvas(board);
-            ctx.drawImage(
-              c,
-              px.x + (L.offsetX ?? 0) - (scrollX % Math.max(1, board.width)),
-              px.y + (L.offsetY ?? 0) - (scrollY % Math.max(1, board.height)),
+            try {
+              c = getBoardCanvas(board);
+              lw = board.width;
+              lh = board.height;
+            } catch {
+              c = null;
+            }
+          }
+          if (!c && L.data && (L.w || L.width) && (L.h || L.height)) {
+            lw = (L.w || L.width) | 0;
+            lh = (L.h || L.height) | 0;
+            c = getLayerDataCanvas(
+              `${px.id}:${L.id}`,
+              L.data,
+              lw,
+              lh,
+              L.rev || 1,
             );
+          }
+          if (c && lw && lh) {
+            // tile horizontally so viewport always filled
+            const baseX = px.x + (L.offsetX ?? 0) - (scrollX % lw);
+            const baseY = px.y + (L.offsetY ?? 0) - (scrollY % Math.max(1, lh));
+            for (let ox = -lw; ox < px.viewW + lw; ox += lw) {
+              ctx.drawImage(c, baseX + ox, baseY);
+            }
+            drew++;
           } else {
-            ctx.fillStyle = hexAlpha("#818cf8", 0.15 + (L.depth ?? 0.5) * 0.2);
-            ctx.fillRect(
-              px.x + ((L.offsetX ?? 0) - scrollX * 0.1),
-              px.y + (L.offsetY ?? 0),
-              px.viewW,
-              px.viewH * 0.4,
-            );
+            // visible failure stripe so empty layers aren't silent
+            ctx.fillStyle = hexAlpha("#818cf8", 0.12 + (L.depth ?? 0.5) * 0.15);
+            ctx.fillRect(px.x, px.y + drew * 18, px.viewW, 16);
           }
         }
         ctx.restore();
         ctx.strokeStyle =
-          px.id === state.activeParallaxId ? "rgba(129,140,248,0.95)" : "rgba(129,140,248,0.5)";
+          px.id === state.activeParallaxId ? "rgba(129,140,248,0.95)" : "rgba(129,140,248,0.55)";
         ctx.lineWidth = 1.5 / cam.zoom;
         ctx.strokeRect(px.x, px.y, px.viewW, px.viewH);
-        if (cam.zoom > 0.2) {
+        if (cam.zoom > 0.15) {
           labels.push({
-            text: `${px.name} · ${px.mode}`,
+            text: `${px.name} · ${drew}/${px.layers?.length || 0} layers`,
             x: cam.x + px.x * cam.zoom,
             y: cam.y + px.y * cam.zoom - 4,
             color: "rgba(129,140,248,0.95)",
+            bg: "rgba(10,12,20,0.75)",
           });
         }
       }
@@ -585,6 +641,21 @@ export function CanvasWorkspace() {
           try {
             const c = getBoardCanvas(b);
             ctx.drawImage(c, b.x, b.y);
+            // flag hollow / failed blit so empty boards are obvious
+            const layer = b.layers?.[0];
+            if (layer && isBufferHollow(layer.data, b.width, b.height)) {
+              ctx.fillStyle = "rgba(232,60,80,0.2)";
+              ctx.fillRect(b.x, b.y, b.width, b.height);
+              if (cam.zoom > 0.2) {
+                labels.push({
+                  text: `${b.name} · MISSING PIXELS`,
+                  x: cam.x + b.x * cam.zoom,
+                  y: cam.y + b.y * cam.zoom + 14,
+                  color: "rgba(255,120,140,0.95)",
+                  bg: "rgba(40,8,12,0.85)",
+                });
+              }
+            }
           } catch {
             /* ignore */
           }

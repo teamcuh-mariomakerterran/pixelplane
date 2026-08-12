@@ -124,9 +124,23 @@ export function RightPanel() {
             >
               Factory reset
             </button>
+            <button
+              type="button"
+              className="rounded-[var(--radius-sm)] border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-[10px] font-semibold text-sky-200 hover:bg-sky-500/20"
+              onClick={() => {
+                void useStudio.getState().rehydrateStarterArt().then((r) => {
+                  useStudio.getState().focusDemoHome();
+                  void saveSnapshot(pickSnapshot(useStudio.getState()));
+                });
+              }}
+              title="Re-download starter-pack pixels into empty boards"
+            >
+              Reload art
+            </button>
           </div>
           <p className="px-3 pb-2 text-[10px] text-subtle">
-            Autosaves in this browser · Ctrl/Cmd+S · restores next visit. If the plane looks empty or smashed together, hit{" "}
+            Autosaves in this browser · Ctrl/Cmd+S. Empty Neon Alley / parallax? Hit{" "}
+            <span className="text-sky-200/90">Reload art</span> or{" "}
             <span className="text-rose-200/90">Factory reset</span>.
           </p>
         </Section>

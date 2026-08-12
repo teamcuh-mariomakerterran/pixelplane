@@ -245,13 +245,15 @@ export type StudioState = {
   duplicateArtboard: (id: string) => string | null;
   applySnapshot: (snap: StudioSnapshot) => void;
   newProject: () => void;
-  seedDemo: () => void;
+  seedDemo: () => void | Promise<void>;
   /** Re-seed smashables + Street Heat quest if a v1 autosave dropped them */
   repairPlaneFoundations: () => { repaired: boolean; detail: string };
   focusSmashAlley: () => void;
   focusDemoHome: () => void;
   /** Wipe autosave + full factory demo (the real hard reset) */
   hardResetDemo: () => Promise<void>;
+  /** Re-download starter-pack art for hollow/missing boards */
+  rehydrateStarterArt: () => Promise<{ fixed: number; total: number }>;
 };
 
 
@@ -2035,7 +2037,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       },
       status: "New project"
     });
-    get().seedDemo();
+    return get().seedDemo();
   },
   seedDemo: () => {
     const board = emptyArtboard(64, 64, 24, 24, "Scratch pad", "note");
@@ -2214,7 +2216,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       },
       status: "Demo plane · quest tree + smash alley ready · City Engine: F smash / E doors"
     });
-    hydrateStarterDemo(get, set);
+    return hydrateStarterDemo(get, set);
   },
 
   repairPlaneFoundations: () => {
@@ -2403,10 +2405,10 @@ export const useStudio = create<StudioState>((set, get) => ({
   },
 
   focusDemoHome: () => {
-    // Characters feed + scene — the readable home frame of the factory demo
-    const zoom = 0.42;
-    const cx = 420;
-    const cy = 480;
+    // Frame characters + neon alley + smash + open field (parallax BGs + quest)
+    const zoom = 0.28;
+    const cx = 900;
+    const cy = 700;
     const vw = typeof window !== "undefined" ? Math.max(640, window.innerWidth - 360) : 900;
     const vh = typeof window !== "undefined" ? Math.max(400, window.innerHeight - 140) : 700;
     set({
@@ -2415,7 +2417,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         x: vw / 2 - cx * zoom,
         y: vh / 2 - cy * zoom,
       },
-      status: "Demo home · Characters + Scene + Smash alley",
+      status: "Demo home · Characters · Neon Alley · Smash · Parallax BGs · Quest",
     });
   },
 
@@ -2427,11 +2429,18 @@ export const useStudio = create<StudioState>((set, get) => ({
     } catch {
       /* still reseed */
     }
-    // newProject already calls seedDemo()
-    get().newProject();
-    // wait for hydrateStarterDemo async image loads
-    await new Promise((r) => setTimeout(r, 1100));
+    try {
+      const { clearPlaneBlitCaches } = await import("@/components/studio/CanvasWorkspace");
+      clearPlaneBlitCaches();
+    } catch {
+      /* */
+    }
+    // newProject → seedDemo → hydrateStarterDemo (await full pixel load)
+    await Promise.resolve(get().newProject());
+    // give paint a tick, then ensure foundations + non-hollow art
+    await new Promise((r) => setTimeout(r, 50));
     get().repairPlaneFoundations();
+    const reh = await get().rehydrateStarterArt();
     get().focusDemoHome();
     try {
       const { saveSnapshot, pickSnapshot } = await import("@/lib/pixel/persist");
@@ -2440,9 +2449,238 @@ export const useStudio = create<StudioState>((set, get) => ({
       /* */
     }
     const s = get();
+    const hollow = s.artboards.filter((b) => {
+      const L = b.layers?.[0];
+      return !L || isBufferHollow(L.data, b.width, b.height);
+    }).length;
     set({
-      status: `Factory demo restored · ${s.artboards.length} boards · ${s.destructibles.length} smashables · ${s.questTrees.length} quest`,
+      status: `Factory demo restored · ${s.artboards.length} boards (${hollow} hollow) · ${s.destructibles.length} smash · ${s.parallaxStacks[0]?.layers?.length || 0} px layers · reloaded ${reh.fixed}`,
     });
+  },
+
+  rehydrateStarterArt: async () => {
+    const { loadImageAsBuffer } = await import("@/lib/starter-pack");
+    const catalog: { name: string; src: string; max: number; bg?: boolean }[] = [
+      { name: "Rat Ninja Front", src: "/starter-pack/characters/rat_ninja_front_idle.jpg", max: 128, bg: true },
+      { name: "Rat Ninja Back", src: "/starter-pack/characters/rat_ninja_back_idle.jpg", max: 128, bg: true },
+      { name: "Rat Ninja Attack", src: "/starter-pack/characters/rat_ninja_attack.png", max: 140, bg: true },
+      { name: "Face Right", src: "/starter-pack/characters/rat_ninja_face_right.png", max: 80, bg: true },
+      { name: "Face Left", src: "/starter-pack/characters/rat_ninja_face_left.png", max: 80, bg: true },
+      { name: "Step Forward", src: "/starter-pack/characters/rat_ninja_step.jpg", max: 120, bg: true },
+      { name: "Neon Alley", src: "/starter-pack/environments/neon_alley.jpg", max: 420 },
+      { name: "Cat Sheet", src: "/starter-pack/sheets/cat_sprite_sheet.png", max: 280 },
+      { name: "zeRo.exe", src: "/starter-pack/characters/zero_exe_idle.jpg", max: 120, bg: true },
+      { name: "BG · Far City", src: "/starter-pack/environments/parallax_far_city.jpg", max: 360 },
+      { name: "BG · Mid Skyline", src: "/starter-pack/environments/parallax_mid_skyline.jpg", max: 360 },
+      { name: "BG · Near Rooftop", src: "/starter-pack/environments/parallax_near_rooftop.jpg", max: 360 },
+      { name: "Rainy City", src: "/starter-pack/environments/rainy_city.jpg", max: 420 },
+    ];
+    let fixed = 0;
+    const s0 = get();
+    let boards = [...s0.artboards];
+    let stacks = s0.parallaxStacks.map((p) => ({
+      ...p,
+      layers: p.layers.map((l) => ({ ...l })),
+    }));
+
+    for (const item of catalog) {
+      let board = boards.find((b) => b.name === item.name);
+      const needs =
+        !board ||
+        !board.layers?.[0] ||
+        isBufferHollow(board.layers[0].data, board.width, board.height);
+      if (!needs && board) {
+        // still refresh parallax layer link/data for BG boards
+        if (item.name.startsWith("BG ·")) {
+          const layerName = item.name.replace(/^BG · /, "");
+          stacks = stacks.map((p) => ({
+            ...p,
+            layers: p.layers.map((L) =>
+              L.name === layerName || (L as { artboardId?: string }).artboardId === board!.id
+                ? {
+                    ...L,
+                    artboardId: board!.id,
+                    data: board!.layers[0]!.data,
+                    w: board!.width,
+                    h: board!.height,
+                    rev: (board!.layers[0]!.rev || 1) + 1,
+                  }
+                : L,
+            ),
+          }));
+        }
+        continue;
+      }
+      try {
+        let { data, w, h } = await loadImageAsBuffer(item.src, item.max);
+        if (item.bg) data = removeBackground(data, w, h);
+        if (isBufferHollow(data, w, h)) continue;
+        if (board) {
+          const layer = {
+            ...board.layers[0]!,
+            data,
+            rev: (board.layers[0]!.rev || 0) + 1,
+          };
+          board = {
+            ...board,
+            width: w,
+            height: h,
+            layers: [layer],
+            activeLayerId: layer.id,
+          };
+          boards = boards.map((b) => (b.id === board!.id ? board! : b));
+        } else {
+          const layer = emptyLayer(w, h, "Base");
+          layer.data = data;
+          layer.rev = 1;
+          // place new boards in sensible zones
+          const pos =
+            item.name === "Neon Alley"
+              ? { x: 40, y: 820 }
+              : item.name === "Rainy City"
+                ? { x: 40, y: 1120 }
+                : item.name === "Cat Sheet"
+                  ? { x: 1480, y: 40 }
+                  : item.name.startsWith("BG ·")
+                    ? {
+                        x: 1550,
+                        y:
+                          40 +
+                          ["Far City", "Mid Skyline", "Near Rooftop"].indexOf(
+                            item.name.replace("BG · ", ""),
+                          ) *
+                            260,
+                      }
+                    : { x: 40, y: 40 };
+          board = emptyArtboard(
+            w,
+            h,
+            pos.x,
+            pos.y,
+            item.name,
+            item.name.includes("City") || item.name.includes("Alley") || item.name.startsWith("BG")
+              ? "scene"
+              : "sheet",
+          );
+          board.layers = [layer];
+          board.activeLayerId = layer.id;
+          boards = [...boards, board];
+        }
+        fixed++;
+        if (item.name.startsWith("BG ·") && board) {
+          const layerName = item.name.replace(/^BG · /, "");
+          stacks = stacks.map((p) => ({
+            ...p,
+            layers: p.layers.map((L) =>
+              L.name === layerName
+                ? {
+                    ...L,
+                    artboardId: board!.id,
+                    data: board!.layers[0]!.data,
+                    w: board!.width,
+                    h: board!.height,
+                    rev: board!.layers[0]!.rev,
+                  }
+                : L,
+            ),
+          }));
+          // if stack has no matching layer, append
+          stacks = stacks.map((p) => {
+            if (p.layers.some((L) => L.name === layerName)) return p;
+            return {
+              ...p,
+              layers: [
+                ...p.layers,
+                {
+                  id: uid("pxl"),
+                  name: layerName,
+                  artboardId: board!.id,
+                  depth: layerName.includes("Far")
+                    ? 0.15
+                    : layerName.includes("Mid")
+                      ? 0.45
+                      : 0.85,
+                  speedX: 0.5,
+                  speedY: 0.3,
+                  scrollScaleX: layerName.includes("Far")
+                    ? 0.15
+                    : layerName.includes("Mid")
+                      ? 0.45
+                      : 0.85,
+                  scrollScaleY: 0.2,
+                  data: board!.layers[0]!.data,
+                  w: board!.width,
+                  h: board!.height,
+                  rev: 1,
+                  visible: true,
+                },
+              ],
+            };
+          });
+        }
+      } catch {
+        /* skip */
+      }
+    }
+
+    // ensure at least one parallax stack exists with linked layers
+    if (!stacks.length || !stacks[0]!.layers.length) {
+      const bgBoards = boards.filter((b) => b.name.startsWith("BG ·"));
+      if (bgBoards.length) {
+        stacks = [
+          {
+            id: uid("px"),
+            name: "Rain City Parallax",
+            x: 1500,
+            y: 1280,
+            viewW: 480,
+            viewH: 280,
+            mode: "viewport" as const,
+            layers: bgBoards.map((b, i) => ({
+              id: uid("pxl"),
+              name: b.name.replace("BG · ", ""),
+              artboardId: b.id,
+              depth: [0.15, 0.45, 0.85][i] ?? 0.5,
+              speedX: 0.5,
+              speedY: 0.3,
+              scrollScaleX: [0.15, 0.45, 0.85][i] ?? 0.5,
+              scrollScaleY: 0.2,
+              data: b.layers[0]!.data,
+              w: b.width,
+              h: b.height,
+              rev: b.layers[0]!.rev,
+              visible: true,
+            })),
+            playing: true,
+            autoPreview: true,
+            previewCamX: 0,
+            previewCamY: 0,
+            folderId: null,
+            folderPath: null,
+          },
+        ];
+      }
+    } else {
+      // reposition viewport out from under quest graph
+      stacks = stacks.map((p, i) =>
+        i === 0 ? { ...p, x: 1500, y: 1280, viewW: Math.max(p.viewW, 480), viewH: Math.max(p.viewH, 280) } : p,
+      );
+    }
+
+    try {
+      const { clearPlaneBlitCaches } = await import("@/components/studio/CanvasWorkspace");
+      clearPlaneBlitCaches();
+    } catch {
+      /* */
+    }
+
+    set({
+      artboards: boards,
+      parallaxStacks: stacks,
+      activeParallaxId: stacks[0]?.id ?? get().activeParallaxId,
+      status: `Starter art · fixed ${fixed}/${catalog.length} · ${stacks[0]?.layers?.length || 0} parallax layers live`,
+    });
+    return { fixed, total: catalog.length };
   },
 }));
 async function hydrateStarterDemo(get: () => StudioState, set: any) {
@@ -2515,7 +2753,7 @@ async function hydrateStarterDemo(get: () => StudioState, set: any) {
     {
       src: "/starter-pack/sheets/cat_sprite_sheet.png",
       name: "Cat Sheet",
-      x: 1500,
+      x: 1480,
       y: 40,
       max: 280,
       kind: "sheet",
@@ -2529,6 +2767,15 @@ async function hydrateStarterDemo(get: () => StudioState, set: any) {
       max: 120,
       kind: "sheet",
       bg: true
+    },
+    {
+      src: "/starter-pack/environments/rainy_city.jpg",
+      name: "Rainy City",
+      x: 40,
+      y: 1120,
+      max: 420,
+      kind: "scene",
+      bg: false
     }
   ];
     const boards = [];
@@ -2610,26 +2857,11 @@ async function hydrateStarterDemo(get: () => StudioState, set: any) {
     }
   ];
     const pLayers = [];
-    let px = 2400;
+    // Open build field — stack parallax BGs where the user can actually see them
+    let px = 1550;
     let py = 40;
     for (const pl of pxLayers) try {
       const { data, w, h } = await loadImageAsBuffer(pl.src, pl.max);
-      pLayers.push({
-        id: uid("pxl"),
-        name: pl.name,
-        depth: pl.depth,
-        scrollScaleX: pl.depth,
-        scrollScaleY: pl.depth * 0.6,
-        repeatX: true,
-        repeatY: false,
-        autoscrollX: 0,
-        autoscrollY: 0,
-        zIndex: pLayers.length,
-        data,
-        w,
-        h,
-        rev: 1
-      });
       const layer = emptyLayer(w, h, "Base");
       layer.data = cloneBuffer(data);
       layer.rev = 1;
@@ -2637,6 +2869,28 @@ async function hydrateStarterDemo(get: () => StudioState, set: any) {
       b.layers = [layer];
       b.activeLayerId = layer.id;
       boards.push(b);
+      pLayers.push({
+        id: uid("pxl"),
+        name: pl.name,
+        artboardId: b.id,
+        depth: pl.depth,
+        speedX: pl.depth,
+        speedY: pl.depth * 0.6,
+        scrollScaleX: pl.depth,
+        scrollScaleY: pl.depth * 0.6,
+        offsetX: 0,
+        offsetY: 0,
+        repeatX: true,
+        repeatY: false,
+        autoscrollX: 0,
+        autoscrollY: 0,
+        zIndex: pLayers.length,
+        data: cloneBuffer(data),
+        w,
+        h,
+        rev: 1,
+        visible: true,
+      });
       py += h + 16;
     } catch {}
     const stacks = [];
@@ -2646,10 +2900,11 @@ async function hydrateStarterDemo(get: () => StudioState, set: any) {
       stacks.push({
         id: uid("px"),
         name: "Rain City Parallax",
+        // below quest graph so both read clearly
         x: 1500,
-        y: 900,
-        viewW: Math.min(480, viewW),
-        viewH: Math.min(260, viewH),
+        y: 1280,
+        viewW: Math.min(520, Math.max(420, viewW)),
+        viewH: Math.min(300, Math.max(240, viewH)),
         mode: "viewport",
         layers: pLayers,
         playing: true,
@@ -2686,7 +2941,7 @@ async function hydrateStarterDemo(get: () => StudioState, set: any) {
         y: 100,
         zoom: 0.32
       },
-      status: `Huge plane · ${boards.length} assets spread across feed fields · scroll-wheel zoom 2%–6400%`
+      status: `Huge plane · ${boards.length} assets · ${pLayers.length} parallax layers · scroll-wheel zoom 2%–6400%`
     });
   } catch {
     set({ status: "Demo ready — open Pack to drop free-use art" });

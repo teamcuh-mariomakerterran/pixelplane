@@ -336,6 +336,22 @@ export function CommandPalette() {
         },
       },
       {
+        id: "rehydrate",
+        group: "Suite",
+        label: "Reload starter art (fix empty boards)",
+        hint: "neon · parallax · rats",
+        keywords: "rehydrate reload missing pixels empty hollow neon parallax art",
+        run: () => {
+          void useStudio.getState().rehydrateStarterArt().then((r) => {
+            useStudio.getState().focusDemoHome();
+            void saveSnapshot(pickSnapshot(useStudio.getState()));
+            useStudio
+              .getState()
+              .setStatus(`Reloaded starter art · fixed ${r.fixed}/${r.total}`);
+          });
+        },
+      },
+      {
         id: "demohome",
         group: "Suite",
         label: "Jump to demo home",
