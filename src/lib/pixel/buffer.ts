@@ -289,24 +289,98 @@ export function compositeLayers(
   const out = createBuffer(w, h);
   for (const layer of layers) {
     if (!layer.visible) continue;
+    const src = coercePixelData(layer.data, w, h);
     const op = layer.opacity;
     for (let i = 0; i < out.length; i += 4) {
-      const sa = (layer.data[i + 3] / 255) * op;
+      const sa = (src[i + 3] / 255) * op;
       if (sa <= 0) continue;
       const da = out[i + 3] / 255;
       const outA = sa + da * (1 - sa);
       if (outA <= 0) continue;
-      out[i] = Math.round((layer.data[i] * sa + out[i] * da * (1 - sa)) / outA);
-      out[i + 1] = Math.round((layer.data[i + 1] * sa + out[i + 1] * da * (1 - sa)) / outA);
-      out[i + 2] = Math.round((layer.data[i + 2] * sa + out[i + 2] * da * (1 - sa)) / outA);
-      out[i + 3] = Math.round(outA * 255);
+      out[i] = Math.round((src[i] * sa + out[i] * da * (1 - sa)) / outA);
+      out[i + 1] = Math.round((src[i + 1] * sa + out[i + 1] * da * (1 - sa)) / outA);
+      out[i + 2] = Math.round((src[i + 2] * sa + out[i + 2] * da * (1 - sa)) / outA);
+      out[i + 3] = Math.round(outA  * 255);
     }
   }
   return out;
 }
 
+/**
+ * IndexedDB / structured-clone can return plain arrays, ArrayBuffers, or
+ * detached views. Always coerce to a dense Uint8ClampedArray of w*h*4.
+ */
+export function coercePixelData(data: unknown, w: number, h: number): Uint8ClampedArray {
+  const need = Math.max(0, (w | 0) * (h | 0) * 4);
+  if (need === 0) return new Uint8ClampedArray(0);
+  if (data instanceof Uint8ClampedArray) {
+    if (data.length === need) return data;
+    const out = new Uint8ClampedArray(need);
+    out.set(data.subarray(0, Math.min(data.length, need)));
+    return out;
+  }
+  if (data instanceof Uint8Array) {
+    const out = new Uint8ClampedArray(need);
+    out.set(data.subarray(0, Math.min(data.length, need)));
+    return out;
+  }
+  if (data instanceof ArrayBuffer) {
+    const out = new Uint8ClampedArray(need);
+    out.set(new Uint8ClampedArray(data).subarray(0, Math.min(data.byteLength, need)));
+    return out;
+  }
+  if (ArrayBuffer.isView(data)) {
+    const view = new Uint8ClampedArray(
+      (data as ArrayBufferView).buffer,
+      (data as ArrayBufferView).byteOffset,
+      (data as ArrayBufferView).byteLength,
+    );
+    const out = new Uint8ClampedArray(need);
+    out.set(view.subarray(0, Math.min(view.length, need)));
+    return out;
+  }
+  if (Array.isArray(data)) {
+    const out = new Uint8ClampedArray(need);
+    const n = Math.min(data.length, need);
+    for (let i = 0; i < n; i++) out[i] = data[i] as number;
+    return out;
+  }
+  // plain object with numeric keys (rare IDB path)
+  if (data && typeof data === "object" && typeof (data as { length?: unknown }).length === "number") {
+    try {
+      const len = (data as { length: number }).length;
+      const out = new Uint8ClampedArray(need);
+      const n = Math.min(len, need);
+      for (let i = 0; i < n; i++) out[i] = Number((data as Record<number, number>)[i]) || 0;
+      return out;
+    } catch {
+      /* fall through */
+    }
+  }
+  return new Uint8ClampedArray(need);
+}
+
+/** True if buffer has essentially no opaque pixels (failed load / empty board). */
+export function isBufferHollow(data: unknown, w: number, h: number): boolean {
+  const buf = coercePixelData(data, w, h);
+  if (buf.length < 16) return true;
+  let opaque = 0;
+  const step = Math.max(4, (buf.length / 4 / 4000) | 0) * 4;
+  for (let i = 3; i < buf.length; i += step) {
+    if (buf[i]! > 8) {
+      opaque++;
+      if (opaque > 12) return false;
+    }
+  }
+  return opaque <= 12;
+}
+
 export function bufferToImageData(data: Uint8ClampedArray, w: number, h: number) {
-  return new ImageData(new Uint8ClampedArray(data), w, h);
+  const buf = coercePixelData(data, w, h);
+  // copy into a fresh ArrayBuffer-backed view for ImageData constructor typing
+  const copy = new Uint8ClampedArray(buf.length);
+  copy.set(buf);
+  return new ImageData(copy, w, h);
 }
 
 export function imageDataToBuffer(img: ImageData) {

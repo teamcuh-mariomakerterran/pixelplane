@@ -4,6 +4,7 @@ import { uid, clamp } from "@/lib/utils";
 import {
   cloneBuffer, createBuffer, drawEllipse, drawLine, drawRectOutline,
   extractRegion, floodFill, hexToRgba, pasteRegion, stampBrush, compositeLayers,
+  coercePixelData, isBufferHollow,
 } from "@/lib/pixel/buffer";
 import { removeBackground } from "@/lib/pixel/bg-remove";
 import { generateCharacter, generateParticlePreview, sheetFromFrames } from "@/lib/pixel/generate";
@@ -248,6 +249,9 @@ export type StudioState = {
   /** Re-seed smashables + Street Heat quest if a v1 autosave dropped them */
   repairPlaneFoundations: () => { repaired: boolean; detail: string };
   focusSmashAlley: () => void;
+  focusDemoHome: () => void;
+  /** Wipe autosave + full factory demo (the real hard reset) */
+  hardResetDemo: () => Promise<void>;
 };
 
 
@@ -1932,19 +1936,48 @@ export const useStudio = create<StudioState>((set, get) => ({
     const destructibles = Array.isArray(snap.destructibles)
       ? snap.destructibles
       : get().destructibles;
+
+    // Coerce pixel buffers — IDB can return plain arrays / wrong lengths
+    const artboards = (Array.isArray(snap.artboards) ? snap.artboards : []).map((b: any) => {
+      const w = b.width | 0;
+      const h = b.height | 0;
+      const layers = (b.layers || []).map((l: any) => ({
+        ...l,
+        data: coercePixelData(l.data, w, h),
+        rev: typeof l.rev === "number" ? l.rev : 1,
+      }));
+      return { ...b, layers };
+    });
+    const animRegions = (Array.isArray(snap.animRegions) ? snap.animRegions : []).map((a: any) => ({
+      ...a,
+      frames: (a.frames || []).map((f: any) => ({
+        ...f,
+        data: coercePixelData(f.data, a.frameW | 0, a.frameH | 0),
+      })),
+    }));
+    const parallaxStacks = (Array.isArray(snap.parallaxStacks) ? snap.parallaxStacks : []).map(
+      (p: any) => ({
+        ...p,
+        layers: (p.layers || []).map((l: any) => ({
+          ...l,
+          data: coercePixelData(l.data, l.w | 0, l.h | 0),
+        })),
+      }),
+    );
+
     set({
       meta: snap.meta ?? get().meta,
       camera: snap.camera ?? get().camera,
-      artboards: snap.artboards ?? [],
-      animRegions: snap.animRegions ?? [],
+      artboards,
+      animRegions,
       particles: snap.particles ?? [],
       actors: snap.actors ?? [],
-      parallaxStacks: snap.parallaxStacks ?? [],
+      parallaxStacks,
       wireZones: snap.wireZones ?? [],
       engineProject: snap.engineProject ?? null,
       questTrees,
       destructibles,
-      activeArtboardId: snap.activeArtboardId ?? null,
+      activeArtboardId: snap.activeArtboardId ?? artboards[0]?.id ?? null,
       activeAnimId: snap.activeAnimId ?? null,
       activeQuestTreeId:
         (snap.activeQuestTreeId as string | null | undefined) ??
@@ -2121,40 +2154,23 @@ export const useStudio = create<StudioState>((set, get) => ({
     };
     questTree.wireZoneId = questZone.id;
     const destRoot = engine.folders.find((f) => f.category === "destructibles");
+    // Sit smashables to the RIGHT of Neon Alley (alley ~x:40–460, y:820) so labels don't pile on the art
     const dests = [
-    createDestructibleProp({
-      x: 200,
-      y: 900,
-      kind: "crate"
-    }),
-    createDestructibleProp({
-      x: 250,
-      y: 905,
-      kind: "crate"
-    }),
-    createDestructibleProp({
-      x: 300,
-      y: 895,
-      kind: "barrel"
-    }),
-    createDestructibleProp({
-      x: 360,
-      y: 900,
-      kind: "pot"
-    }),
-    createDestructibleProp({
-      x: 160,
-      y: 960,
-      kind: "sign"
-    })
-  ];
+      createDestructibleProp({ x: 500, y: 840, kind: "crate" }),
+      createDestructibleProp({ x: 560, y: 845, kind: "crate" }),
+      createDestructibleProp({ x: 620, y: 835, kind: "barrel" }),
+      createDestructibleProp({ x: 680, y: 850, kind: "pot" }),
+      createDestructibleProp({ x: 520, y: 910, kind: "sign" }),
+      createDestructibleProp({ x: 590, y: 915, kind: "barrel" }),
+      createDestructibleProp({ x: 660, y: 920, kind: "crate" }),
+    ];
     const destZone = {
       id: uid("wire"),
       name: "Smashables alley",
-      x: 120,
-      y: 860,
-      w: 320,
-      h: 200,
+      x: 480,
+      y: 800,
+      w: 300,
+      h: 220,
       category: "destructibles",
       folderId: destRoot?.id ?? null,
       folderPath: destRoot?.path ?? null,
@@ -2224,18 +2240,37 @@ export const useStudio = create<StudioState>((set, get) => ({
 
     if (!dests.length) {
       dests = [
-        createDestructibleProp({ x: 200, y: 900, kind: "crate" }),
-        createDestructibleProp({ x: 250, y: 905, kind: "crate" }),
-        createDestructibleProp({ x: 300, y: 895, kind: "barrel" }),
-        createDestructibleProp({ x: 360, y: 900, kind: "pot" }),
-        createDestructibleProp({ x: 160, y: 960, kind: "sign" }),
-        // extra row so alley reads denser
-        createDestructibleProp({ x: 220, y: 950, kind: "barrel" }),
-        createDestructibleProp({ x: 320, y: 955, kind: "crate" }),
+        createDestructibleProp({ x: 500, y: 840, kind: "crate" }),
+        createDestructibleProp({ x: 560, y: 845, kind: "crate" }),
+        createDestructibleProp({ x: 620, y: 835, kind: "barrel" }),
+        createDestructibleProp({ x: 680, y: 850, kind: "pot" }),
+        createDestructibleProp({ x: 520, y: 910, kind: "sign" }),
+        createDestructibleProp({ x: 590, y: 915, kind: "barrel" }),
+        createDestructibleProp({ x: 660, y: 920, kind: "crate" }),
       ];
       patches.destructibles = dests;
       patches.activeDestructibleId = dests[0]!.id;
       notes.push(`${dests.length} smashables`);
+    } else {
+      // migrate old on-top-of-alley positions (x < 450, y > 850) off the Neon Alley art
+      const overlapping = dests.filter((d) => d.x < 450 && d.y > 780);
+      if (overlapping.length >= Math.min(3, dests.length)) {
+        const layout = [
+          { x: 500, y: 840 },
+          { x: 560, y: 845 },
+          { x: 620, y: 835 },
+          { x: 680, y: 850 },
+          { x: 520, y: 910 },
+          { x: 590, y: 915 },
+          { x: 660, y: 920 },
+        ];
+        dests = dests.map((d, i) => {
+          const p = layout[i % layout.length]!;
+          return { ...d, x: p.x, y: p.y };
+        });
+        patches.destructibles = dests;
+        notes.push("relocated smashables off Neon Alley");
+      }
     }
 
     if (!quests.length) {
@@ -2300,15 +2335,18 @@ export const useStudio = create<StudioState>((set, get) => ({
       }
     }
 
-    // smashables alley zone if missing
-    if (!zones.some((z) => z.category === "destructibles" || /smash/i.test(z.name))) {
+    // smashables alley zone if missing or still on top of neon alley
+    const smashZone = zones.find(
+      (z) => z.category === "destructibles" || /smash/i.test(z.name),
+    );
+    if (!smashZone) {
       const destRoot = engine.folders.find((f) => f.category === "destructibles");
       const destZone: WireZone = {
         id: uid("wire"),
         name: "Smashables alley",
-        x: 120,
-        y: 860,
-        w: 360,
+        x: 480,
+        y: 800,
+        w: 300,
         h: 220,
         category: "destructibles",
         folderId: destRoot?.id ?? null,
@@ -2319,6 +2357,14 @@ export const useStudio = create<StudioState>((set, get) => ({
       zones = [...zones, destZone];
       patches.wireZones = zones;
       notes.push("smashables alley plane");
+    } else if (smashZone.x < 400) {
+      zones = zones.map((z) =>
+        z.id === smashZone.id
+          ? { ...z, x: 480, y: 800, w: 300, h: 220 }
+          : z,
+      );
+      patches.wireZones = zones;
+      notes.push("shifted smash zone off Neon Alley");
     }
 
     if (!notes.length) {
@@ -2335,17 +2381,15 @@ export const useStudio = create<StudioState>((set, get) => ({
 
   focusSmashAlley: () => {
     const s = get();
-    // prefer zone, else first smashable, else hard default
     const zone =
       s.wireZones.find((z) => z.category === "destructibles" || /smash/i.test(z.name)) ??
       null;
     const d = s.destructibles[0];
-    const cx = zone ? zone.x + zone.w / 2 : d ? d.x + d.w / 2 : 280;
-    const cy = zone ? zone.y + zone.h / 2 : d ? d.y + d.h / 2 : 930;
-    const zoom = 0.85;
-    // center roughly in main canvas (leave room for side chrome)
-    const vw = typeof window !== "undefined" ? Math.max(640, window.innerWidth - 320) : 900;
-    const vh = typeof window !== "undefined" ? Math.max(400, window.innerHeight - 120) : 700;
+    const cx = zone ? zone.x + zone.w / 2 : d ? d.x + d.w / 2 : 630;
+    const cy = zone ? zone.y + zone.h / 2 : d ? d.y + d.h / 2 : 900;
+    const zoom = 0.9;
+    const vw = typeof window !== "undefined" ? Math.max(640, window.innerWidth - 360) : 900;
+    const vh = typeof window !== "undefined" ? Math.max(400, window.innerHeight - 140) : 700;
     set({
       camera: {
         zoom,
@@ -2355,6 +2399,49 @@ export const useStudio = create<StudioState>((set, get) => ({
       activeDestructibleId: d?.id ?? s.activeDestructibleId,
       activeWireZoneId: zone?.id ?? s.activeWireZoneId,
       status: `Framed Smashables alley · ${s.destructibles.length} props`,
+    });
+  },
+
+  focusDemoHome: () => {
+    // Characters feed + scene — the readable home frame of the factory demo
+    const zoom = 0.42;
+    const cx = 420;
+    const cy = 480;
+    const vw = typeof window !== "undefined" ? Math.max(640, window.innerWidth - 360) : 900;
+    const vh = typeof window !== "undefined" ? Math.max(400, window.innerHeight - 140) : 700;
+    set({
+      camera: {
+        zoom,
+        x: vw / 2 - cx * zoom,
+        y: vh / 2 - cy * zoom,
+      },
+      status: "Demo home · Characters + Scene + Smash alley",
+    });
+  },
+
+  hardResetDemo: async () => {
+    set({ status: "Hard reset · wiping browser save + reseeding factory demo…" });
+    try {
+      const { clearSnapshot } = await import("@/lib/pixel/persist");
+      await clearSnapshot();
+    } catch {
+      /* still reseed */
+    }
+    // newProject already calls seedDemo()
+    get().newProject();
+    // wait for hydrateStarterDemo async image loads
+    await new Promise((r) => setTimeout(r, 1100));
+    get().repairPlaneFoundations();
+    get().focusDemoHome();
+    try {
+      const { saveSnapshot, pickSnapshot } = await import("@/lib/pixel/persist");
+      await saveSnapshot(pickSnapshot(get()));
+    } catch {
+      /* */
+    }
+    const s = get();
+    set({
+      status: `Factory demo restored · ${s.artboards.length} boards · ${s.destructibles.length} smashables · ${s.questTrees.length} quest`,
     });
   },
 }));

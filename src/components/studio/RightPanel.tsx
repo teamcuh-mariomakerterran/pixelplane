@@ -114,9 +114,20 @@ export function RightPanel() {
             >
               Clear save
             </button>
+            <button
+              type="button"
+              className="rounded-[var(--radius-sm)] border border-rose-500/50 bg-rose-500/15 px-2 py-1 text-[10px] font-semibold text-rose-200 hover:bg-rose-500/25"
+              onClick={() => {
+                void useStudio.getState().hardResetDemo();
+              }}
+              title="Wipe browser save and rebuild factory demo plane"
+            >
+              Factory reset
+            </button>
           </div>
           <p className="px-3 pb-2 text-[10px] text-subtle">
-            Autosaves in this browser · Ctrl/Cmd+S · restores next visit
+            Autosaves in this browser · Ctrl/Cmd+S · restores next visit. If the plane looks empty or smashed together, hit{" "}
+            <span className="text-rose-200/90">Factory reset</span>.
           </p>
         </Section>
 

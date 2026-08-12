@@ -35,6 +35,7 @@ import { useSpatialNav } from "@/store/spatial-nav";
 import { usePlaneSystems } from "@/store/plane-systems";
 import { useMemoryWeb } from "@/store/memory-web";
 import { loadSnapshot, pickSnapshot, saveSnapshot, snapshotMissingFoundations } from "@/lib/pixel/persist";
+import { isBufferHollow } from "@/lib/pixel/buffer";
 import { useCollab } from "@/store/collab";
 import {
   eventToChord,
@@ -122,21 +123,35 @@ export function StudioShell() {
       const s = useStudio.getState();
       if (snap && Array.isArray(snap.artboards) && (snap.artboards as unknown[]).length > 0) {
         applySnapshot(snap as unknown as Record<string, unknown>);
-        // v1 autosaves dropped smashables + quest trees — heal without wiping art
         const after = useStudio.getState();
-        const needRepair =
-          snapshotMissingFoundations(snap) ||
-          after.destructibles.length === 0 ||
-          after.questTrees.length === 0;
-        if (needRepair) {
-          const r = after.repairPlaneFoundations();
-          if (r.repaired) {
-            // persist healed foundations immediately so next boot is clean
-            void saveSnapshot(pickSnapshot(useStudio.getState()));
+        // hollow boards = pixel data died in IDB — factory reset is safer than ghost plane
+        const hollow =
+          after.artboards.length > 0 &&
+          after.artboards.filter((b) => {
+            const layer = b.layers?.[0];
+            if (!layer) return true;
+            return isBufferHollow(layer.data, b.width, b.height);
+          }).length >= Math.max(1, Math.floor(after.artboards.length * 0.6));
+
+        if (hollow) {
+          await after.hardResetDemo();
+        } else {
+          const needRepair =
+            snapshotMissingFoundations(snap) ||
+            after.destructibles.length === 0 ||
+            after.questTrees.length === 0 ||
+            after.destructibles.some((d) => d.x < 450 && d.y > 780);
+          if (needRepair) {
+            const r = useStudio.getState().repairPlaneFoundations();
+            if (r.repaired) {
+              useStudio.getState().focusDemoHome();
+              void saveSnapshot(pickSnapshot(useStudio.getState()));
+            }
           }
         }
       } else if (s.artboards.length === 0) {
         seedDemo();
+        setTimeout(() => useStudio.getState().focusDemoHome(), 1200);
       }
       setReady(true);
       setTimeout(() => {

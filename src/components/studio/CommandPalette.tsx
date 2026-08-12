@@ -326,6 +326,23 @@ export function CommandPalette() {
         },
       },
       {
+        id: "hardreset",
+        group: "Suite",
+        label: "FACTORY RESET — wipe save & reseed demo",
+        hint: "fixes broken autosave",
+        keywords: "hard reset factory wipe clear reseed demo broken fucked fix plane",
+        run: () => {
+          void useStudio.getState().hardResetDemo();
+        },
+      },
+      {
+        id: "demohome",
+        group: "Suite",
+        label: "Jump to demo home",
+        keywords: "home focus characters scene demo frame",
+        run: () => useStudio.getState().focusDemoHome(),
+      },
+      {
         id: "repairplane",
         group: "Suite",
         label: "Repair missing plane foundations",
