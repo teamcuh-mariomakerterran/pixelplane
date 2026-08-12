@@ -326,6 +326,27 @@ export function CommandPalette() {
         },
       },
       {
+        id: "repairplane",
+        group: "Suite",
+        label: "Repair missing plane foundations",
+        hint: "smash alley · Street Heat quest · feed zones",
+        keywords: "repair smashables alley quest foundations missing restore",
+        run: () => {
+          const r = useStudio.getState().repairPlaneFoundations();
+          useStudio.getState().focusSmashAlley();
+          if (r.repaired) {
+            void saveSnapshot(pickSnapshot(useStudio.getState()));
+          }
+        },
+      },
+      {
+        id: "smashalley",
+        group: "Suite",
+        label: "Jump to Smashables alley",
+        keywords: "smash alley crates barrel destructibles focus",
+        run: () => useStudio.getState().focusSmashAlley(),
+      },
+      {
         id: "engine",
         group: "Suite",
         label: "Enter City Engine",

@@ -1,6 +1,9 @@
 /**
  * IndexedDB project persistence for PixelPlane.
  * Stores serializable studio snapshot (pixels via structured clone).
+ *
+ * v2: also persists quest trees + destructibles (smash alley) + active ids.
+ * v1 saves still load; missing fields are repaired on boot.
  */
 
 const DB_NAME = "pixelplane_v1";
@@ -8,7 +11,7 @@ const STORE = "projects";
 const KEY = "autosave";
 
 export type PersistedSnapshot = {
-  version: 1;
+  version: 1 | 2;
   savedAt: number;
   meta: unknown;
   camera: unknown;
@@ -25,6 +28,14 @@ export type PersistedSnapshot = {
   brushSize: number;
   tool: string;
   pixelMode?: string;
+  /** v2 — smashables alley + quest graph (were silently dropped in v1) */
+  questTrees?: unknown;
+  destructibles?: unknown;
+  activeQuestTreeId?: string | null;
+  activeDestructibleId?: string | null;
+  activeWireZoneId?: string | null;
+  activeParticleId?: string | null;
+  activeParallaxId?: string | null;
 };
 
 function openDb(): Promise<IDBDatabase> {
@@ -93,9 +104,16 @@ export function pickSnapshot(state: {
   color: string;
   brushSize: number;
   tool: string;
+  questTrees?: unknown;
+  destructibles?: unknown;
+  activeQuestTreeId?: string | null;
+  activeDestructibleId?: string | null;
+  activeWireZoneId?: string | null;
+  activeParticleId?: string | null;
+  activeParallaxId?: string | null;
 }): PersistedSnapshot {
   return {
-    version: 1,
+    version: 2,
     savedAt: Date.now(),
     meta: state.meta,
     camera: state.camera,
@@ -111,5 +129,22 @@ export function pickSnapshot(state: {
     color: state.color,
     brushSize: state.brushSize,
     tool: state.tool,
+    questTrees: state.questTrees ?? [],
+    destructibles: state.destructibles ?? [],
+    activeQuestTreeId: state.activeQuestTreeId ?? null,
+    activeDestructibleId: state.activeDestructibleId ?? null,
+    activeWireZoneId: state.activeWireZoneId ?? null,
+    activeParticleId: state.activeParticleId ?? null,
+    activeParallaxId: state.activeParallaxId ?? null,
   };
+}
+
+/** True when a restored v1/partial save lost smash alley / quest foundations */
+export function snapshotMissingFoundations(snap: PersistedSnapshot | null | undefined): boolean {
+  if (!snap) return true;
+  const dests = snap.destructibles;
+  const quests = snap.questTrees;
+  const noDests = !Array.isArray(dests) || dests.length === 0;
+  const noQuests = !Array.isArray(quests) || quests.length === 0;
+  return noDests || noQuests;
 }

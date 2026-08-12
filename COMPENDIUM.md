@@ -150,6 +150,12 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 
 ## 3. Changelog (newest first)
 
+### 2026-08-12 — Autosave foundations fix (smash alley / quests)
+- **Bug:** IndexedDB autosave (v1) never persisted `destructibles` or `questTrees`. After restore, artboards came back but **Smashables alley + Street Heat quest vanished** — “lots missing on canvas.”
+- **Fix:** persist v2 includes smashables + quests + active ids; `applySnapshot` restores them; boot auto-repairs incomplete saves without wiping art.
+- **UX:** Ctrl+K → **Repair missing plane foundations** · **Jump to Smashables alley**; smash props draw bolder with labels at lower zoom.
+- **Audit:** typecheck clean · palette repair → “Framed Smashables alley · 5 props”
+
 ### 2026-08-10 — Holy Shit Layer IV (Law & Logic · engine + canvas)
 - **Rule Cards (§6.6):** sticky WHEN→THEN logic on the plane; Street Heat seed deck (6 cards); export `pixelplane_rule_cards.json` input map; Systems dock + Ctrl+K; live evaluation in City Engine (smash heat, sirens, sprint boost, status/hints)
 - **Wanted stars + heat pursuit:** smash/ram builds ★0–5; pursuit sedans chase player; minimap heat blips; red edge pulse + siren chips; HUD star row

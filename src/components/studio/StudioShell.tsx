@@ -34,7 +34,7 @@ import { RuleCardsPanel } from "./RuleCardsPanel";
 import { useSpatialNav } from "@/store/spatial-nav";
 import { usePlaneSystems } from "@/store/plane-systems";
 import { useMemoryWeb } from "@/store/memory-web";
-import { loadSnapshot, pickSnapshot, saveSnapshot } from "@/lib/pixel/persist";
+import { loadSnapshot, pickSnapshot, saveSnapshot, snapshotMissingFoundations } from "@/lib/pixel/persist";
 import { useCollab } from "@/store/collab";
 import {
   eventToChord,
@@ -122,14 +122,25 @@ export function StudioShell() {
       const s = useStudio.getState();
       if (snap && Array.isArray(snap.artboards) && (snap.artboards as unknown[]).length > 0) {
         applySnapshot(snap as unknown as Record<string, unknown>);
+        // v1 autosaves dropped smashables + quest trees — heal without wiping art
+        const after = useStudio.getState();
+        const needRepair =
+          snapshotMissingFoundations(snap) ||
+          after.destructibles.length === 0 ||
+          after.questTrees.length === 0;
+        if (needRepair) {
+          const r = after.repairPlaneFoundations();
+          if (r.repaired) {
+            // persist healed foundations immediately so next boot is clean
+            void saveSnapshot(pickSnapshot(useStudio.getState()));
+          }
+        }
       } else if (s.artboards.length === 0) {
         seedDemo();
       }
       setReady(true);
-      // intro tip for bookmarks once
       setTimeout(() => {
         useHotkeys.getState().pushTip("command_palette", { x: 280, y: 72 });
-        // minimap tip deferred — one tip at a time; shows when user first pans near it via FEATURE later
       }, 1200);
     })();
     return () => {

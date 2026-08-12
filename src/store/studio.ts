@@ -245,6 +245,9 @@ export type StudioState = {
   applySnapshot: (snap: StudioSnapshot) => void;
   newProject: () => void;
   seedDemo: () => void;
+  /** Re-seed smashables + Street Heat quest if a v1 autosave dropped them */
+  repairPlaneFoundations: () => { repaired: boolean; detail: string };
+  focusSmashAlley: () => void;
 };
 
 
@@ -1923,6 +1926,12 @@ export const useStudio = create<StudioState>((set, get) => ({
     return copy.id;
   },
   applySnapshot: (snap) => {
+    const questTrees = Array.isArray(snap.questTrees)
+      ? snap.questTrees
+      : get().questTrees;
+    const destructibles = Array.isArray(snap.destructibles)
+      ? snap.destructibles
+      : get().destructibles;
     set({
       meta: snap.meta ?? get().meta,
       camera: snap.camera ?? get().camera,
@@ -1933,13 +1942,30 @@ export const useStudio = create<StudioState>((set, get) => ({
       parallaxStacks: snap.parallaxStacks ?? [],
       wireZones: snap.wireZones ?? [],
       engineProject: snap.engineProject ?? null,
+      questTrees,
+      destructibles,
       activeArtboardId: snap.activeArtboardId ?? null,
       activeAnimId: snap.activeAnimId ?? null,
+      activeQuestTreeId:
+        (snap.activeQuestTreeId as string | null | undefined) ??
+        questTrees[0]?.id ??
+        null,
+      activeDestructibleId:
+        (snap.activeDestructibleId as string | null | undefined) ??
+        destructibles[0]?.id ??
+        null,
+      activeWireZoneId:
+        (snap.activeWireZoneId as string | null | undefined) ??
+        get().activeWireZoneId,
+      activeParticleId:
+        (snap.activeParticleId as string | null | undefined) ?? null,
+      activeParallaxId:
+        (snap.activeParallaxId as string | null | undefined) ?? null,
       color: typeof snap.color === "string" ? snap.color : get().color,
       brushSize: typeof snap.brushSize === "number" ? snap.brushSize : get().brushSize,
       history: [],
       future: [],
-      status: `Restored autosave · ${new Date(snap.savedAt || Date.now()).toLocaleString()}`
+      status: `Restored autosave · ${new Date((snap as { savedAt?: number }).savedAt || Date.now()).toLocaleString()}`,
     });
   },
   newProject: () => {
@@ -2173,7 +2199,164 @@ export const useStudio = create<StudioState>((set, get) => ({
       status: "Demo plane · quest tree + smash alley ready · City Engine: F smash / E doors"
     });
     hydrateStarterDemo(get, set);
-  }
+  },
+
+  repairPlaneFoundations: () => {
+    const s = get();
+    const patches: Partial<StudioState> = {};
+    const notes: string[] = [];
+    let dests = s.destructibles;
+    let quests = s.questTrees;
+    let zones = s.wireZones;
+    let engine = s.engineProject;
+
+    // Ensure engine project exists so wire folders resolve
+    if (!engine) {
+      engine = createEngineProject({
+        name: "PixelPlane Demo Game",
+        engine: "godot",
+        rootFolderName: "pixelplane_demo",
+        defaultCharacterSize: 48,
+      });
+      patches.engineProject = engine;
+      notes.push("engine project");
+    }
+
+    if (!dests.length) {
+      dests = [
+        createDestructibleProp({ x: 200, y: 900, kind: "crate" }),
+        createDestructibleProp({ x: 250, y: 905, kind: "crate" }),
+        createDestructibleProp({ x: 300, y: 895, kind: "barrel" }),
+        createDestructibleProp({ x: 360, y: 900, kind: "pot" }),
+        createDestructibleProp({ x: 160, y: 960, kind: "sign" }),
+        // extra row so alley reads denser
+        createDestructibleProp({ x: 220, y: 950, kind: "barrel" }),
+        createDestructibleProp({ x: 320, y: 955, kind: "crate" }),
+      ];
+      patches.destructibles = dests;
+      patches.activeDestructibleId = dests[0]!.id;
+      notes.push(`${dests.length} smashables`);
+    }
+
+    if (!quests.length) {
+      const questRoot = engine.folders.find((f) => f.category === "quests");
+      const questTree = createStarterQuestTree({
+        x: 1480,
+        y: 780,
+        name: "Street Heat — first night",
+        color: WIRE_CATEGORY_META.quests.color,
+      });
+      questTree.nodes = questTree.nodes.map((n) => {
+        if (n.kind === "objective")
+          return {
+            ...n,
+            title: "Smash the alley crates",
+            body: "Break 5 street props · links to destructibles",
+          };
+        if (n.kind === "start")
+          return {
+            ...n,
+            title: "Call from the crew",
+            body: "Meet at the neon alley",
+          };
+        return n;
+      });
+      quests = [questTree];
+      patches.questTrees = quests;
+      patches.activeQuestTreeId = questTree.id;
+      notes.push("Street Heat quest");
+
+      // wire zone for quests if missing
+      if (!zones.some((z) => z.category === "quests" || /quest/i.test(z.name))) {
+        const questZone: WireZone = {
+          id: uid("wire"),
+          name: "Quest lines",
+          x: 1450,
+          y: 750,
+          w: 480,
+          h: 480,
+          category: "quests",
+          folderId: questRoot?.id ?? null,
+          folderPath: questRoot?.path ?? null,
+          color: WIRE_CATEGORY_META.quests.color,
+          enabled: true,
+          questTreeId: questTree.id,
+        };
+        questTree.wireZoneId = questZone.id;
+        zones = [...zones, questZone];
+        patches.wireZones = zones;
+        notes.push("quest feed plane");
+      } else {
+        // link first quest zone
+        zones = zones.map((z) =>
+          z.category === "quests" || /quest/i.test(z.name)
+            ? { ...z, questTreeId: questTree.id }
+            : z,
+        );
+        questTree.wireZoneId =
+          zones.find((z) => z.category === "quests" || /quest/i.test(z.name))?.id ??
+          null;
+        patches.wireZones = zones;
+      }
+    }
+
+    // smashables alley zone if missing
+    if (!zones.some((z) => z.category === "destructibles" || /smash/i.test(z.name))) {
+      const destRoot = engine.folders.find((f) => f.category === "destructibles");
+      const destZone: WireZone = {
+        id: uid("wire"),
+        name: "Smashables alley",
+        x: 120,
+        y: 860,
+        w: 360,
+        h: 220,
+        category: "destructibles",
+        folderId: destRoot?.id ?? null,
+        folderPath: destRoot?.path ?? null,
+        color: WIRE_CATEGORY_META.destructibles.color,
+        enabled: true,
+      };
+      zones = [...zones, destZone];
+      patches.wireZones = zones;
+      notes.push("smashables alley plane");
+    }
+
+    if (!notes.length) {
+      set({ status: "Plane foundations already intact" });
+      return { repaired: false, detail: "nothing missing" };
+    }
+
+    set({
+      ...patches,
+      status: `Repaired plane · ${notes.join(" · ")}`,
+    });
+    return { repaired: true, detail: notes.join(", ") };
+  },
+
+  focusSmashAlley: () => {
+    const s = get();
+    // prefer zone, else first smashable, else hard default
+    const zone =
+      s.wireZones.find((z) => z.category === "destructibles" || /smash/i.test(z.name)) ??
+      null;
+    const d = s.destructibles[0];
+    const cx = zone ? zone.x + zone.w / 2 : d ? d.x + d.w / 2 : 280;
+    const cy = zone ? zone.y + zone.h / 2 : d ? d.y + d.h / 2 : 930;
+    const zoom = 0.85;
+    // center roughly in main canvas (leave room for side chrome)
+    const vw = typeof window !== "undefined" ? Math.max(640, window.innerWidth - 320) : 900;
+    const vh = typeof window !== "undefined" ? Math.max(400, window.innerHeight - 120) : 700;
+    set({
+      camera: {
+        zoom,
+        x: vw / 2 - cx * zoom,
+        y: vh / 2 - cy * zoom,
+      },
+      activeDestructibleId: d?.id ?? s.activeDestructibleId,
+      activeWireZoneId: zone?.id ?? s.activeWireZoneId,
+      status: `Framed Smashables alley · ${s.destructibles.length} props`,
+    });
+  },
 }));
 async function hydrateStarterDemo(get: () => StudioState, set: any) {
   try {

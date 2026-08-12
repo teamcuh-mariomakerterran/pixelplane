@@ -733,27 +733,36 @@ export function CanvasWorkspace() {
         }
       }
 
-      // Destructibles
+      // Destructibles — bold street props (visible even at mid zoom)
       for (const d of state.destructibles) {
         const stage = currentStage(d);
         const ratio = d.hp / Math.max(1, d.maxHp);
-        ctx.fillStyle = hexAlpha(d.color, 0.35 + ratio * 0.4);
-        ctx.strokeStyle =
-          d.id === state.activeDestructibleId ? "#fff" : hexAlpha(d.color, 0.9);
-        ctx.lineWidth = 1.25 / cam.zoom;
+        const active = d.id === state.activeDestructibleId;
+        // outer glow so alley reads at distance
+        ctx.fillStyle = hexAlpha(d.color, active ? 0.28 : 0.14);
+        ctx.fillRect(d.x - 4 / cam.zoom, d.y - 4 / cam.zoom, d.w + 8 / cam.zoom, d.h + 8 / cam.zoom);
+        ctx.fillStyle = hexAlpha(d.color, 0.45 + ratio * 0.4);
+        ctx.strokeStyle = active ? "#fff" : hexAlpha(d.color, 0.95);
+        ctx.lineWidth = (active ? 2.5 : 1.5) / cam.zoom;
         ctx.fillRect(d.x, d.y, d.w, d.h);
         ctx.strokeRect(d.x, d.y, d.w, d.h);
+        // kind glyph
+        ctx.fillStyle = "rgba(0,0,0,0.35)";
+        ctx.fillRect(d.x + 4, d.y + 4, d.w - 8, d.h - 8);
+        ctx.fillStyle = hexAlpha(d.color, 0.95);
+        ctx.fillRect(d.x + d.w * 0.25, d.y + d.h * 0.25, d.w * 0.5, d.h * 0.5);
         // hp bar
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(d.x, d.y - 6 / cam.zoom, d.w, 3 / cam.zoom);
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillRect(d.x, d.y - 7 / cam.zoom, d.w, 4 / cam.zoom);
         ctx.fillStyle = ratio > 0.5 ? "#4ecb71" : ratio > 0.2 ? "#e8a838" : "#e85d5d";
-        ctx.fillRect(d.x, d.y - 6 / cam.zoom, d.w * ratio, 3 / cam.zoom);
-        if (cam.zoom > 0.35) {
+        ctx.fillRect(d.x, d.y - 7 / cam.zoom, d.w * ratio, 4 / cam.zoom);
+        if (cam.zoom > 0.18) {
           labels.push({
             text: `${d.name} · ${stage?.label ?? ""}`,
             x: cam.x + d.x * cam.zoom,
             y: cam.y + d.y * cam.zoom - 10,
             color: "rgba(249,115,22,0.95)",
+            bg: "rgba(12,10,8,0.72)",
           });
         }
       }
