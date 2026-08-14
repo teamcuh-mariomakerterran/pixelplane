@@ -40,7 +40,7 @@ export type Artboard = {
   height: number;
   layers: Layer[];
   activeLayerId: string;
-  kind: "sheet" | "scene" | "hud" | "note" | "indoor";
+  kind: "sheet" | "scene" | "hud" | "note" | "indoor" | "variant";
 };
 
 export type AnimFrame = {
@@ -218,6 +218,12 @@ export type WireZone = {
   enabled: boolean;
   questTreeId?: string | null;
   destructibleId?: string | null;
+  /** Armed craft / mutate action for this feed plane. */
+  trigger?: {
+    kind: "none" | "boil" | "tile_kit" | "qa" | "mutate" | "bloom";
+    armed: boolean;
+    lastFiredAt?: number;
+  };
 };
 
 export type WireConnectorKind = WireCategory;

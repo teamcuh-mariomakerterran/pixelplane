@@ -57,7 +57,7 @@ export function RuleCardsPanel() {
       <div className="max-h-[34vh] overflow-y-auto p-1.5">
         {cards.length === 0 && (
           <p className="px-1 py-2 text-[10px] text-muted">
-            No rules yet. Seed the Street Heat deck or add a card. Live in City Engine.
+            No rules yet. Seed deck parks cards in the Open build field (not on your art). Drag with Move/Select. Live in City Engine.
           </p>
         )}
         {cards.map((c) => {

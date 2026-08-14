@@ -11,6 +11,20 @@ const BASE = "/packs/goodies";
 
 type Item = { file: string; name: string; x: number; y: number; max: number };
 
+export type GoodiesItem = Item;
+
+/** Combined catalog for category planes + library browser. */
+export function allGoodiesItems(): GoodiesItem[] {
+  const seen = new Set<string>();
+  const out: GoodiesItem[] = [];
+  for (const it of [...LAYOUT_CORE, ...LAYOUT_SKYLINE, ...LAYOUT_CITYKIT, ...LAYOUT_WAVE9]) {
+    if (seen.has(it.file)) continue;
+    seen.add(it.file);
+    out.push(it);
+  }
+  return out;
+}
+
 /** Wave 1+2 catalog boards. */
 const LAYOUT_CORE: Item[] = [
   { file: "gear/inventory_weapons_armor.png", name: "Gear · weapons & armor", x: 0, y: 0, max: 300 },
@@ -231,6 +245,16 @@ const LAYOUT_CITYKIT: Item[] = [
   { file: "citykit/vehicles_armed_dark.jpg", name: "City · armed dark cars", x: 1020, y: 10160, max: 280 },
 ];
 
+/** Wave 9 — leftover sheets + FX lab source. */
+const LAYOUT_WAVE9: Item[] = [
+  { file: "drinks/cooking_profession.jpg", name: "Cook · profession sheet", x: 0, y: 0, max: 280 },
+  { file: "ui/integrity_bar.png", name: "UI · integrity bar", x: 320, y: 0, max: 220 },
+  { file: "fx/hp_bar_strip.png", name: "FX · HP bar strip", x: 580, y: 0, max: 220 },
+  { file: "ui/integrity_energy_bars.png", name: "UI · integrity/energy", x: 840, y: 0, max: 180 },
+  { file: "drinks/shots_fx.jpg", name: "Bar · shot effects", x: 0, y: 280, max: 240 },
+  { file: "items/quest_icons_utility.jpg", name: "Items · utility icons", x: 280, y: 280, max: 220 },
+];
+
 async function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const im = new Image();
@@ -259,20 +283,39 @@ async function placeLayout(
   layout: Item[],
   ox: number,
   oy: number,
-): Promise<number> {
+  grid?: { cols: number; cell: number },
+): Promise<string[]> {
   const studio = useStudio.getState();
-  let placed = 0;
+  const ids: string[] = [];
+  let i = 0;
   for (const item of layout) {
     try {
       const img = await loadImage(`${BASE}/${item.file}`);
       const { data, w, h } = toBoard(img, item.max);
-      studio.importImageToArtboard(data, w, h, item.name, ox + item.x, oy + item.y);
-      placed++;
+      const px = grid
+        ? ox + (i % grid.cols) * grid.cell
+        : ox + item.x;
+      const py = grid
+        ? oy + Math.floor(i / grid.cols) * grid.cell
+        : oy + item.y;
+      const id = studio.importImageToArtboard(data, w, h, item.name, px, py);
+      ids.push(id);
+      i++;
     } catch {
       /* skip */
     }
   }
-  return placed;
+  return ids;
+}
+
+export async function placeGoodiesGrid(
+  items: Item[],
+  ox: number,
+  oy: number,
+  cols = 5,
+  cell = 280,
+): Promise<string[]> {
+  return placeLayout(items, ox, oy, { cols, cell });
 }
 
 /** Full dump wave 1–4. */
@@ -283,9 +326,9 @@ export async function summonGoodiesDrop(): Promise<number> {
   const ox = (-cam.x + 160) / z;
   const oy = (-cam.y + 80) / z;
 
-  const a = await placeLayout(LAYOUT_CORE, ox, oy);
-  const b = await placeLayout(LAYOUT_SKYLINE, ox, oy + 2800);
-  const c = await placeLayout(LAYOUT_CITYKIT, ox, oy + 3400);
+  const a = (await placeLayout(LAYOUT_CORE, ox, oy)).length;
+  const b = (await placeLayout(LAYOUT_SKYLINE, ox, oy + 2800)).length;
+  const c = (await placeLayout(LAYOUT_CITYKIT, ox, oy + 3400)).length;
   const placed = a + b + c;
 
   if (placed) {
@@ -310,7 +353,7 @@ export async function summonSkylineSet(): Promise<number> {
   const ox = (-cam.x + 200) / z;
   const oy = (-cam.y + 100) / z;
 
-  const placed = await placeLayout(LAYOUT_SKYLINE, ox, oy);
+  const placed = (await placeLayout(LAYOUT_SKYLINE, ox, oy)).length;
   if (placed) {
     studio.createWireZone(ox - 40, oy - 40, 1700, 520, "environments");
     const zones = useStudio.getState().wireZones;
@@ -331,7 +374,7 @@ export async function summonCityKit(): Promise<number> {
   const ox = (-cam.x + 180) / z;
   const oy = (-cam.y + 90) / z;
 
-  const placed = await placeLayout(LAYOUT_CITYKIT, ox, oy);
+  const placed = (await placeLayout(LAYOUT_CITYKIT, ox, oy)).length;
   if (placed) {
     studio.createWireZone(ox - 40, oy - 40, 1850, 10600, "environments");
     const zones = useStudio.getState().wireZones;
@@ -342,6 +385,80 @@ export async function summonCityKit(): Promise<number> {
     stampTimeline("City kit", `${placed} sheets`);
   }
   return placed;
+}
+
+const FX_LAB_EMITTERS: Array<{
+  kind: "spark" | "smoke" | "magic" | "dust" | "slash";
+  color: string;
+  name: string;
+}> = [
+  { kind: "spark", color: "#fb923c", name: "Spark jet" },
+  { kind: "smoke", color: "#94a3b8", name: "Smoke column" },
+  { kind: "magic", color: "#c084fc", name: "Magic swirl" },
+  { kind: "dust", color: "#d6b07c", name: "Dust settle" },
+  { kind: "slash", color: "#3ecfcf", name: "Slash arc" },
+];
+
+function placeFxEmitters(ox: number, oy: number) {
+  const studio = useStudio.getState();
+  const names = new Set(studio.particles.map((p) => p.name));
+  const add = FX_LAB_EMITTERS.filter((k) => !names.has(k.name)).map((k, i) => ({
+    id: `fx_lab_${k.kind}_${i}`,
+    name: k.name,
+    x: ox + i * 76,
+    y: oy,
+    w: 60,
+    h: 60,
+    kind: k.kind,
+    rate: 18,
+    life: 1.05,
+    color: k.color,
+    playing: true,
+  }));
+  if (add.length) {
+    useStudio.setState({
+      particles: [...studio.particles, ...add],
+    });
+  }
+  return add.length;
+}
+
+/** Wave 9 — leftover boards + FX emitter row + shader lab. */
+export async function summonFxLab(): Promise<number> {
+  const studio = useStudio.getState();
+  const cam = studio.camera;
+  const z = cam.zoom || 1;
+  const ox = (-cam.x + 180) / z;
+  const oy = (-cam.y + 90) / z;
+
+  const placed = (await placeLayout(LAYOUT_WAVE9, ox, oy)).length;
+  const emitters = placeFxEmitters(ox, oy + 520);
+
+  try {
+    const { useShaderGraph } = await import("@/store/shader-graph");
+    if (useShaderGraph.getState().graphs.length === 0) {
+      useShaderGraph.getState().seedLab(false);
+    }
+    const g = useShaderGraph.getState().graphs[0];
+    if (g) {
+      useShaderGraph.getState().moveGraph(g.id, Math.round(ox + 40), Math.round(oy + 640));
+    }
+  } catch {
+    /* */
+  }
+
+  if (placed || emitters) {
+    studio.createWireZone(ox - 40, oy - 40, 1180, 980, "effects");
+    const zones = useStudio.getState().wireZones;
+    const last = zones[zones.length - 1];
+    if (last) studio.renameWireZone(last.id, "FX Lab · Wave 9");
+    studio.setStatus(`FX Lab · ${placed} boards · ${emitters} emitters · shader graph live`);
+    studio.setCamera({ x: -ox * z + 40, y: -oy * z + 40, zoom: Math.min(0.45, z) });
+    stampTimeline("FX Lab wave 9", `${placed} boards + ${emitters} FX`);
+  } else {
+    studio.setStatus("FX Lab failed to load");
+  }
+  return placed + emitters;
 }
 
 /** Named quest tools from drop art (for inventory kernel). */

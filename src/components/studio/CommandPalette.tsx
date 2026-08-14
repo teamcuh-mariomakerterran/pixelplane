@@ -11,12 +11,16 @@ import { useSignature } from "@/store/signature";
 import { TOOL_LABELS } from "@/lib/hotkeys/defaults";
 import type { ToolId } from "@/lib/pixel/types";
 import { summonNightDistrict } from "@/lib/packs/night-district";
-import { summonGoodiesDrop, summonSkylineSet, summonCityKit } from "@/lib/packs/goodies";
+import { summonGoodiesDrop, summonSkylineSet, summonCityKit, summonFxLab } from "@/lib/packs/goodies";
+import { useShaderGraph } from "@/store/shader-graph";
 import { stampTimeline } from "@/store/timeline";
 import { useKernels } from "@/store/kernels";
 import { useSoundSprites } from "@/store/sound-sprites";
 import { useTimeline } from "@/store/timeline";
 import { useRuleCards } from "@/store/rule-cards";
+import { useCategoryPlanes } from "@/store/category-planes";
+import { CATALOG } from "@/lib/packs/category-planes";
+import { useCraftLab } from "@/store/craft-lab";
 import { pickSnapshot, saveSnapshot } from "@/lib/pixel/persist";
 import { Keyboard } from "lucide-react";
 
@@ -137,9 +141,91 @@ export function CommandPalette() {
       {
         id: "mutate",
         group: "Signature",
-        label: "Mutation rails (4 variants)",
-        keywords: "mutation rails neon dusk chrome",
+        label: "Mutation rails (live variants)",
+        hint: "neon dusk chrome outline crush scale bloom",
+        keywords: "mutation rails neon dusk chrome bloom outline crush",
         run: () => useSignature.getState().spawnMutationRails(),
+      },
+      {
+        id: "mutate-full",
+        group: "Signature",
+        label: "Mutation rails — full kit",
+        hint: "8 rails including bloom + 2× scale",
+        keywords: "mutation full outline crush scale bloom",
+        run: () => useSignature.getState().spawnMutationRails({ full: true }),
+      },
+      {
+        id: "bloom-bake",
+        group: "Signature",
+        label: "Bake neon bloom rail",
+        keywords: "neon bloom bake glow",
+        run: () => useSignature.getState().bakeNeonBloomOnActive(),
+      },
+      {
+        id: "asset-planes",
+        group: "Signature",
+        label: "Open asset plane picker",
+        hint: "vehicles buildings UI gear…",
+        keywords: "library category plane vehicles buildings assets",
+        run: () => useCategoryPlanes.getState().setShowPanel(true),
+      },
+      ...CATALOG.map((c) => ({
+        id: `cat-${c.id}`,
+        group: "Asset planes",
+        label: `Open ${c.name} plane`,
+        hint: c.hint,
+        keywords: `category ${c.id} ${c.name} ${c.hint}`,
+        run: () => {
+          void useCategoryPlanes.getState().openKind(c.id);
+        },
+      })),
+      {
+        id: "craft",
+        group: "Craft",
+        label: "Open Craft lab",
+        hint: "boil · tiles · QA",
+        keywords: "craft boil tile qa quality",
+        run: () => useCraftLab.getState().setShowPanel(true),
+      },
+      {
+        id: "boil-on",
+        group: "Craft",
+        label: "Toggle animation boil",
+        keywords: "boil wobble jitter life",
+        run: () => {
+          const c = useCraftLab.getState();
+          c.setBoilOn(!c.boilOn);
+        },
+      },
+      {
+        id: "tile-kit",
+        group: "Craft",
+        label: "Grow tile kit from board",
+        hint: "20 variants · rot wear edges corners",
+        keywords: "tile kit autotile worn edge corner",
+        run: () => useCraftLab.getState().spawnTileKit(),
+      },
+      {
+        id: "sprite-qa",
+        group: "Craft",
+        label: "Run sprite QA",
+        keywords: "qa orphan bleed palette check",
+        run: () => useCraftLab.getState().runQa(),
+      },
+      {
+        id: "fire-zone",
+        group: "Wires",
+        label: "Fire selected plane trigger",
+        hint: "T · boil / tile / QA / mutate / bloom",
+        keywords: "fire trigger wire valve boil tile qa mutate bloom",
+        run: () => useStudio.getState().fireZoneTrigger(),
+      },
+      {
+        id: "fire-armed",
+        group: "Wires",
+        label: "Fire all armed plane triggers",
+        keywords: "fire all armed wires",
+        run: () => useStudio.getState().fireArmedTriggers(),
       },
       {
         id: "goodies",
@@ -175,6 +261,84 @@ export function CommandPalette() {
           void summonCityKit().then((n) => {
             if (n) stampTimeline("City kit", `${n} sheets`);
           });
+        },
+      },
+      {
+        id: "fxlab",
+        group: "Signature",
+        label: "Summon FX Lab (Wave 9)",
+        hint: "emitters · leftover boards · shader graph",
+        keywords: "fx lab wave 9 particles shader crt cook integrity emitters spark smoke slash",
+        run: () => {
+          void summonFxLab().then((n) => {
+            if (n) stampTimeline("FX Lab", `${n} items`);
+          });
+        },
+      },
+      {
+        id: "shaderseed",
+        group: "Signature",
+        label: "Seed Shader Lab on plane",
+        hint: "Neon CRT node graph",
+        keywords: "shader graph crt scanlines chroma glow vignette webgl",
+        run: () => useShaderGraph.getState().seedLab(true),
+      },
+      {
+        id: "shadertoggle",
+        group: "Signature",
+        label: "Toggle shader lab on plane",
+        keywords: "shader hide show graph",
+        run: () => {
+          const s = useShaderGraph.getState();
+          const next = !s.showOnPlane;
+          s.setShowOnPlane(next);
+          useStudio.getState().setStatus(next ? "Shader lab visible" : "Shader lab hidden");
+        },
+      },
+      {
+        id: "shadervhs",
+        group: "Signature",
+        label: "Shader look · VHS Tape",
+        keywords: "shader vhs tape chroma tracking",
+        run: () => {
+          const s = useShaderGraph.getState();
+          if (!s.graphs[0]) s.seedLab(true);
+          const id = useShaderGraph.getState().graphs[0]?.id;
+          if (id) useShaderGraph.getState().applyPreset(id, "vhs");
+        },
+      },
+      {
+        id: "shaderacid",
+        group: "Signature",
+        label: "Shader look · Acid Rain",
+        keywords: "shader acid hue warp psychedelic",
+        run: () => {
+          const s = useShaderGraph.getState();
+          if (!s.graphs[0]) s.seedLab(true);
+          const id = useShaderGraph.getState().graphs[0]?.id;
+          if (id) useShaderGraph.getState().applyPreset(id, "acid");
+        },
+      },
+      {
+        id: "shadernight",
+        group: "Signature",
+        label: "Shader look · Night Vision",
+        keywords: "shader night vision green tube",
+        run: () => {
+          const s = useShaderGraph.getState();
+          if (!s.graphs[0]) s.seedLab(true);
+          const id = useShaderGraph.getState().graphs[0]?.id;
+          if (id) useShaderGraph.getState().applyPreset(id, "night");
+        },
+      },
+      {
+        id: "shaderengine",
+        group: "Signature",
+        label: "Toggle CRT grade on City Engine",
+        keywords: "shader engine post crt grade city",
+        run: () => {
+          const s = useShaderGraph.getState();
+          s.setEnginePost(!s.enginePost);
         },
       },
       {

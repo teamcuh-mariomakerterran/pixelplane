@@ -18,6 +18,7 @@ export type RuleEffect = {
   playSiren?: boolean;
   speedMult?: number;
   remaps?: Array<{ from: string; to: string }>;
+  fireTrigger?: "boil" | "tile_kit" | "qa" | "mutate" | "bloom";
 };
 
 function whenMatches(when: RuleWhen, ev: RuleEvent, wanted: number): boolean {
@@ -56,6 +57,8 @@ function applyThen(then: RuleThen): RuleEffect {
       return { speedMult: then.mult };
     case "remap_key":
       return { remaps: [{ from: then.from, to: then.to }] };
+    case "fire_trigger":
+      return { fireTrigger: then.trigger };
   }
 }
 
@@ -77,6 +80,7 @@ export function evalRules(
     if (e.speedMult)
       out.speedMult = (out.speedMult ?? 1) * e.speedMult;
     if (e.remaps) out.remaps = [...(out.remaps ?? []), ...e.remaps];
+    if (e.fireTrigger) out.fireTrigger = e.fireTrigger;
   }
   return out;
 }

@@ -22,7 +22,8 @@ export type RuleThen =
   | { kind: "play_siren" }
   | { kind: "hint"; text: string }
   | { kind: "boost_speed"; mult: number }
-  | { kind: "remap_key"; from: string; to: string };
+  | { kind: "remap_key"; from: string; to: string }
+  | { kind: "fire_trigger"; trigger: "boil" | "tile_kit" | "qa" | "mutate" | "bloom" };
 
 export type RuleCard = {
   id: string;
@@ -96,6 +97,13 @@ const PRESETS: Array<Omit<RuleCard, "id" | "x" | "y">> = [
     enabled: true,
     color: "#4ecb71",
   },
+  {
+    name: "Smash → Boil",
+    when: { kind: "smash" },
+    then: { kind: "fire_trigger", trigger: "boil" },
+    enabled: true,
+    color: "#3ecfcf",
+  },
 ];
 
 export function whenLabel(w: RuleWhen): string {
@@ -129,7 +137,86 @@ export function thenLabel(t: RuleThen): string {
       return `Speed ×${t.mult}`;
     case "remap_key":
       return `Remap ${t.from}→${t.to}`;
+    case "fire_trigger":
+      return `Fire ${t.trigger.replace("_", " ")} planes`;
   }
+}
+
+
+/** Card footprint on the plane */
+const CARD_W = 148;
+const CARD_H = 78;
+const CARD_GAP_X = 168;
+const CARD_GAP_Y = 110;
+
+/**
+ * Find a clear home for the rule deck — open build field / right of quest,
+ * never stacked on characters / neon alley / smashables.
+ */
+function ruleDeckOrigin(count: number): { x: number; y: number } {
+  const s = useStudio.getState();
+  const cols = Math.min(3, Math.max(1, count));
+  const rows = Math.ceil(count / cols);
+  const needW = cols * CARD_GAP_X;
+  const needH = rows * CARD_GAP_Y;
+
+  // Occupied AABBs from plane clutter
+  const boxes: { x: number; y: number; w: number; h: number }[] = [];
+  for (const b of s.artboards) boxes.push({ x: b.x, y: b.y, w: b.width, h: b.height });
+  for (const z of s.wireZones) {
+    // allow open build field as a candidate host, but avoid other zones' cores
+    if (z.category === "scenes" && /open/i.test(z.name || "")) continue;
+    boxes.push({ x: z.x, y: z.y, w: z.w, h: z.h });
+  }
+  for (const d of s.destructibles) boxes.push({ x: d.x - 8, y: d.y - 8, w: d.w + 16, h: d.h + 16 });
+  for (const q of s.questTrees) {
+    // quest trees sit near their first nodes / zone
+    boxes.push({ x: q.x, y: q.y, w: q.w || 480, h: q.h || 480 });
+  }
+  for (const p of s.parallaxStacks) boxes.push({ x: p.x, y: p.y, w: p.viewW, h: p.viewH });
+  for (const a of s.animRegions) boxes.push({ x: a.x, y: a.y, w: a.frameW, h: a.frameH });
+  for (const p of s.particles) boxes.push({ x: p.x, y: p.y, w: p.w, h: p.h });
+
+  const overlaps = (x: number, y: number) => {
+    const x2 = x + needW;
+    const y2 = y + needH;
+    for (const b of boxes) {
+      if (x < b.x + b.w && x2 > b.x && y < b.y + b.h && y2 > b.y) return true;
+    }
+    return false;
+  };
+
+  // Prefer open build field (demo seeds it at ~1400,720)
+  const open = s.wireZones.find(
+    (z) => z.category === "scenes" || /open build/i.test(z.name || ""),
+  );
+  const candidates: { x: number; y: number }[] = [];
+  if (open) {
+    // right half of open field, clear of quest cluster on the left of that zone
+    candidates.push(
+      { x: open.x + open.w * 0.55, y: open.y + 40 },
+      { x: open.x + open.w * 0.55, y: open.y + open.h * 0.35 },
+      { x: open.x + 40, y: open.y + open.h * 0.55 },
+    );
+  }
+  // fixed free pads relative to demo layout
+  candidates.push(
+    { x: 2200, y: 820 },
+    { x: 2100, y: 1100 },
+    { x: 2200, y: 200 },
+    { x: 40, y: 1500 },
+    { x: 1900, y: 1500 },
+  );
+
+  for (const c of candidates) {
+    const x = Math.round(c.x);
+    const y = Math.round(c.y);
+    if (!overlaps(x, y)) return { x, y };
+  }
+  // fallback: far right of everything
+  let maxX = 1800;
+  for (const b of boxes) maxX = Math.max(maxX, b.x + b.w);
+  return { x: Math.round(maxX + 80), y: 800 };
 }
 
 export const useRuleCards = create<RuleState>((set, get) => ({
@@ -143,39 +230,67 @@ export const useRuleCards = create<RuleState>((set, get) => ({
 
   placeCard: (partial) => {
     const s = useStudio.getState();
-    const cam = s.camera;
     const id = uid("rule");
     const n = get().cards.length;
+    // stack next to existing cards, else park in free open-field space
+    let x: number;
+    let y: number;
+    if (partial?.x != null && partial?.y != null) {
+      x = partial.x;
+      y = partial.y;
+    } else if (get().cards.length) {
+      const last = get().cards[get().cards.length - 1]!;
+      x = last.x + CARD_GAP_X;
+      y = last.y;
+      // wrap every 3
+      if ((n % 3) === 0) {
+        x = get().cards[Math.floor(n / 3) * 3]?.x ?? last.x;
+        y = last.y + CARD_GAP_Y;
+      }
+    } else {
+      const home = ruleDeckOrigin(1);
+      x = home.x;
+      y = home.y;
+    }
     const card: RuleCard = {
       id,
       name: partial?.name ?? `Rule ${n + 1}`,
-      x: partial?.x ?? (320 - cam.x) / (cam.zoom || 1) + n * 12,
-      y: partial?.y ?? (180 - cam.y) / (cam.zoom || 1) + n * 12,
+      x: Math.round(x),
+      y: Math.round(y),
       when: partial?.when ?? { kind: "key", code: "KeyF" },
       then: partial?.then ?? { kind: "status", text: "Rule fired" },
       enabled: partial?.enabled ?? true,
       color: partial?.color ?? COLORS[n % COLORS.length]!,
     };
     set((st) => ({ cards: [...st.cards, card], activeId: id }));
-    s.setStatus(`Rule card · ${card.name}`);
+    s.setStatus(`Rule card · ${card.name} @ ${card.x},${card.y}`);
     stampTimeline("Rule card", card.name);
     return id;
   },
 
   seedStreetHeatDeck: () => {
     const s = useStudio.getState();
-    const cam = s.camera;
-    const baseX = (280 - cam.x) / (cam.zoom || 1);
-    const baseY = (140 - cam.y) / (cam.zoom || 1);
+    const home = ruleDeckOrigin(PRESETS.length);
     const cards: RuleCard[] = PRESETS.map((p, i) => ({
       ...p,
       id: uid("rule"),
-      x: baseX + (i % 3) * 168,
-      y: baseY + Math.floor(i / 3) * 110,
+      x: home.x + (i % 3) * CARD_GAP_X,
+      y: home.y + Math.floor(i / 3) * CARD_GAP_Y,
     }));
     set({ cards, activeId: cards[0]?.id ?? null, showOnPlane: true });
-    s.setStatus(`Street Heat rule deck · ${cards.length} cards`);
-    stampTimeline("Rule deck", `${cards.length} cards`);
+    // Frame the deck so it's obvious they didn't land on Neon Alley
+    const cx = home.x + CARD_GAP_X;
+    const cy = home.y + CARD_GAP_Y * 0.5;
+    const zoom = 0.45;
+    const vw = typeof window !== "undefined" ? Math.max(640, window.innerWidth - 360) : 900;
+    const vh = typeof window !== "undefined" ? Math.max(400, window.innerHeight - 140) : 700;
+    s.setCamera({
+      zoom,
+      x: vw / 2 - cx * zoom,
+      y: vh / 2 - cy * zoom,
+    });
+    stampTimeline("Rule deck", `${cards.length} cards @ open field`);
+    s.setStatus(`Street Heat rule deck · ${cards.length} cards · parked open field (${home.x},${home.y})`);
   },
 
   updateCard: (id, patch) =>

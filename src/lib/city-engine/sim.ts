@@ -42,7 +42,10 @@ import {
 } from "./heat";
 import { evalRules, createCooldowns, type RuleCooldowns } from "@/lib/rules/engine-bridge";
 import { useRuleCards } from "@/store/rule-cards";
+import { useStudio } from "@/store/studio";
 import { useSoundSprites } from "@/store/sound-sprites";
+import type { JuiceSfx } from "@/lib/audio/juice";
+import { worldPan } from "@/lib/audio/juice";
 import type { RuleCard } from "@/store/rule-cards";
 
 export type Mode = "foot" | "drive";
@@ -125,12 +128,69 @@ export type EngineState = {
   ruleCd: RuleCooldowns;
   /** last speed mult from rules */
   ruleSpeedMult: number;
-  /** camera shake remaining (seconds) */
+  /** camera shake remaining (seconds) — kept in sync with trauma */
   shake: number;
   /** Layer IV+ foot dust particles */
   dust: { x: number; y: number; life: number; vx: number; vy: number }[];
   /** ambient day phase 0–1 */
   dayPhase: number;
+  /** Juice: trauma 0..1, shake magnitude = trauma² */
+  trauma: number;
+  /** Hitstop remaining (seconds) — freeze sim, keep rendering */
+  hitstop: number;
+  /** Camera zoom punch 0..1 */
+  punch: number;
+  /** Player squash 0..1 (smash impact) */
+  squash: number;
+  combo: number;
+  comboTimer: number;
+  pops: JuicePop[];
+  skids: { x: number; y: number; rot: number; life: number }[];
+  boostTrail: { x: number; y: number; rot: number; life: number }[];
+  /** directional camera kick */
+  kickX: number;
+  kickY: number;
+  wasBoosting: boolean;
+  wasMoving: boolean;
+  /** expanding impact rings */
+  rings: JuiceRing[];
+  /** flying smash shards */
+  shards: JuiceShard[];
+  /** RGB split remaining 0..1 */
+  chroma: number;
+  /** footstep sfx cooldown */
+  footCd: number;
+};
+
+export type JuicePop = {
+  x: number;
+  y: number;
+  text: string;
+  life: number;
+  max: number;
+  vy: number;
+  color: string;
+};
+
+export type JuiceRing = {
+  x: number;
+  y: number;
+  life: number;
+  max: number;
+  color: string;
+};
+
+export type JuiceShard = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  rot: number;
+  spin: number;
+  life: number;
+  w: number;
+  h: number;
+  color: string;
 };
 
 export function createEngineState(
@@ -186,6 +246,23 @@ export function createEngineState(
     shake: 0,
     dust: [],
     dayPhase: 0.35,
+    trauma: 0,
+    hitstop: 0,
+    punch: 0,
+    squash: 0,
+    combo: 0,
+    comboTimer: 0,
+    pops: [],
+    skids: [],
+    boostTrail: [],
+    kickX: 0,
+    kickY: 0,
+    wasBoosting: false,
+    wasMoving: false,
+    rings: [],
+    shards: [],
+    chroma: 0,
+    footCd: 0,
   };
 }
 
@@ -204,6 +281,176 @@ function emitQuest(s: EngineState, ev: QuestEvent) {
   if (s.quest.completed) {
     s.status = `QUEST COMPLETE · ${s.quest.name}`;
   }
+}
+
+function addPop(
+  s: EngineState,
+  x: number,
+  y: number,
+  text: string,
+  color: string,
+) {
+  s.pops.push({
+    x,
+    y,
+    text,
+    life: 0.9,
+    max: 0.9,
+    vy: -48,
+    color,
+  });
+  if (s.pops.length > 18) s.pops.splice(0, s.pops.length - 18);
+}
+
+function burstDust(s: EngineState, x: number, y: number, n = 10) {
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 20 + Math.random() * 50;
+    s.dust.push({
+      x: x + (Math.random() - 0.5) * 10,
+      y: y + (Math.random() - 0.5) * 10,
+      life: 0.35 + Math.random() * 0.4,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp,
+    });
+  }
+  if (s.dust.length > 120) s.dust.splice(0, s.dust.length - 120);
+}
+
+function burstRing(s: EngineState, x: number, y: number, color: string, max = 0.45) {
+  if (!s.rings) s.rings = [];
+  s.rings.push({ x, y, life: max, max, color });
+  if (s.rings.length > 16) s.rings.splice(0, s.rings.length - 16);
+}
+
+function burstShards(s: EngineState, x: number, y: number, n: number, color: string) {
+  if (!s.shards) s.shards = [];
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 40 + Math.random() * 110;
+    s.shards.push({
+      x,
+      y,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp - 20,
+      rot: Math.random() * Math.PI,
+      spin: (Math.random() - 0.5) * 14,
+      life: 0.35 + Math.random() * 0.45,
+      w: 2 + Math.random() * 4,
+      h: 2 + Math.random() * 3,
+      color,
+    });
+  }
+  if (s.shards.length > 90) s.shards.splice(0, s.shards.length - 90);
+}
+
+function hopJuice(s: EngineState, label: string) {
+  s.punch = Math.min(1, s.punch + 0.55);
+  s.squash = Math.min(1, s.squash + 0.55);
+  s.trauma = Math.min(1, s.trauma + 0.18);
+  burstDust(s, s.player.x, s.player.y, 10);
+  burstRing(s, s.player.x, s.player.y, "#3ecfcf", 0.35);
+  addPop(s, s.player.x, s.player.y - 16, label, "#3ecfcf");
+}
+
+/** Presentation juice — never changes gameplay outcomes. */
+function playJuice(s: EngineState, kind: JuiceSfx, pitch = 1, worldX?: number) {
+  try {
+    const pan = worldPan(worldX ?? s.player.x, s.camX);
+    useSoundSprites.getState().playKind(kind, pitch, pan);
+  } catch {
+    /* */
+  }
+}
+
+function followCam(s: EngineState, dt: number, look: number) {
+  const p = s.player;
+  const tx = p.x + Math.cos(p.rot) * look;
+  const ty = p.y + Math.sin(p.rot) * look;
+  const k = 1 - Math.exp(-9 * dt);
+  s.camX += (tx - s.camX) * k;
+  s.camY += (ty - s.camY) * k;
+}
+
+function juiceImpact(s: EngineState, x: number, y: number, destroyed: boolean) {
+  s.combo += 1;
+  s.comboTimer = 1.7;
+  const add = destroyed ? 0.72 : 0.36;
+  s.trauma = Math.min(1, s.trauma + add);
+  s.shake = s.trauma;
+  s.hitstop = Math.max(s.hitstop, destroyed ? 0.08 : 0.04);
+  s.punch = Math.min(1, s.punch + (destroyed ? 0.7 : 0.32));
+  s.squash = Math.min(1, s.squash + (destroyed ? 0.85 : 0.45));
+  const dx = s.camX - x;
+  const dy = s.camY - y;
+  const len = Math.hypot(dx, dy) || 1;
+  s.kickX = (dx / len) * (destroyed ? 10 : 5);
+  s.kickY = (dy / len) * (destroyed ? 10 : 5);
+  if (destroyed) {
+    playJuice(s, "smash", 0.92 + Math.random() * 0.16 + s.combo * 0.03, x);
+    if (s.combo >= 5) playJuice(s, "blip", 1.2 + s.combo * 0.04, x);
+  } else {
+    playJuice(s, "hit", 0.9 + Math.random() * 0.2, x);
+  }
+  if (destroyed) {
+    addPop(
+      s,
+      x,
+      y - 12,
+      s.combo > 1 ? `${s.combo}× SMASH` : "SMASH",
+      s.combo >= 5 ? "#f472b6" : "#fb923c",
+    );
+    burstDust(s, x, y, 14);
+    burstRing(s, x, y, s.combo >= 5 ? "#f472b6" : "#fb923c", 0.5);
+    burstShards(s, x, y, 10 + Math.min(8, s.combo), "#e8a838");
+    s.chroma = Math.min(1, s.chroma + 0.55);
+  } else {
+    addPop(s, x, y - 8, "HIT", "#e8a838");
+    burstDust(s, x, y, 6);
+    burstRing(s, x, y, "#e8a838", 0.28);
+    burstShards(s, x, y, 4, "#c4a35a");
+    s.chroma = Math.min(1, s.chroma + 0.22);
+  }
+}
+
+function tickJuice(s: EngineState, dt: number) {
+  // pops / trails keep moving during hitstop so the freeze reads as impact
+  s.pops = s.pops
+    .map((p) => ({ ...p, life: p.life - dt, y: p.y + p.vy * dt, vy: p.vy + 18 * dt }))
+    .filter((p) => p.life > 0);
+  s.skids = s.skids
+    .map((k) => ({ ...k, life: k.life - dt }))
+    .filter((k) => k.life > 0);
+  s.boostTrail = s.boostTrail
+    .map((k) => ({ ...k, life: k.life - dt }))
+    .filter((k) => k.life > 0);
+  s.rings = (s.rings ?? [])
+    .map((r) => ({ ...r, life: r.life - dt }))
+    .filter((r) => r.life > 0);
+  s.shards = (s.shards ?? [])
+    .map((sh) => ({
+      ...sh,
+      life: sh.life - dt,
+      x: sh.x + sh.vx * dt,
+      y: sh.y + sh.vy * dt,
+      vy: sh.vy + 140 * dt,
+      rot: sh.rot + sh.spin * dt,
+    }))
+    .filter((sh) => sh.life > 0);
+
+  if (s.hitstop > 0) return;
+
+  s.trauma = Math.max(0, s.trauma - dt * 1.85);
+  s.shake = s.trauma;
+  s.punch = Math.max(0, s.punch - dt * 4.2);
+  s.squash = Math.max(0, s.squash - dt * 5.5);
+  s.kickX *= Math.max(0, 1 - dt * 8);
+  s.kickY *= Math.max(0, 1 - dt * 8);
+  s.chroma = Math.max(0, s.chroma - dt * 2.4);
+  if (Math.abs(s.kickX) < 0.15) s.kickX = 0;
+  if (Math.abs(s.kickY) < 0.15) s.kickY = 0;
+  s.comboTimer = Math.max(0, s.comboTimer - dt);
+  if (s.comboTimer <= 0) s.combo = 0;
 }
 
 function noteDestroyed(s: EngineState, before: WorldProp[], after: WorldProp[], kindHint?: string) {
@@ -234,6 +481,13 @@ function applyRuleEffect(
     );
   }
   if (effect.speedMult) s.ruleSpeedMult = effect.speedMult;
+  if (effect.fireTrigger) {
+    try {
+      useStudio.getState().fireArmedTriggers(effect.fireTrigger);
+    } catch {
+      /* studio may not be mounted */
+    }
+  }
   return !!effect.playSiren;
 }
 
@@ -245,9 +499,16 @@ function getRuleCards(): RuleCard[] {
   }
 }
 
-function playSirenSafe() {
+function playSirenSafe(s?: EngineState) {
   try {
-    useSoundSprites.getState().playKind("siren", 1);
+    let pan = 0;
+    if (s) {
+      const hv = s.heatUnits
+        .map((u) => s.vehicles.find((v) => v.id === u.vehicleId))
+        .find(Boolean);
+      if (hv) pan = worldPan(hv.x, s.camX);
+    }
+    useSoundSprites.getState().playKind("siren", 1, pan);
   } catch {
     /* ignore */
   }
@@ -394,16 +655,16 @@ export function trySmash(s: EngineState) {
   const before = s.props.map((x) => ({ ...x }));
   s.props = s.props.map((x) => (x.id === p.id ? damageProp(x, 16) : x));
   s.smashFlash = 0.25;
-  s.shake = Math.max(s.shake, 0.18);
-  noteDestroyed(s, before, s.props, p.kind);
   const after = s.props.find((x) => x.id === p.id);
+  juiceImpact(s, p.x + p.w / 2, p.y + p.h / 2, !!after?.gone);
+  noteDestroyed(s, before, s.props, p.kind);
   if (after?.gone) {
     s.player.wanted = Math.min(5, s.player.wanted + 0.35);
     const cards = getRuleCards();
     const effect = evalRules(cards, { type: "smash" }, s.player.wanted);
     const siren = applyRuleEffect(s, effect);
     if (siren && s.t - s.ruleCd.sirenAt > 1.2) {
-      playSirenSafe();
+      playSirenSafe(s);
       s.ruleCd.sirenAt = s.t;
     }
     ensureHeatUnits(s);
@@ -470,6 +731,8 @@ export function tryEnterExit(s: EngineState) {
     s.player.vehicleId = null;
     s.targetZoom = zoomTargets(s.profile, "foot");
     s.status = "On foot · closer camera";
+    playJuice(s, "hop_out", 1);
+    hopJuice(s, "OUT");
     return;
   }
 
@@ -485,6 +748,8 @@ export function tryEnterExit(s: EngineState) {
     veh.speed = 0;
     s.targetZoom = zoomTargets(s.profile, "drive");
     s.status = `Driving ${defOf(veh.defId).name} · city view`;
+    playJuice(s, "hop_in", 1);
+    hopJuice(s, "IN");
     emitQuest(s, { kind: "enter_vehicle", at: s.t });
     const cards = getRuleCards();
     const effect = evalRules(cards, { type: "enter_vehicle" }, s.player.wanted);
@@ -501,6 +766,11 @@ function key(s: EngineState, ...codes: string[]) {
 
 export function step(s: EngineState, dt: number) {
   s.t += dt;
+  tickJuice(s, dt);
+  if (s.hitstop > 0) {
+    s.hitstop = Math.max(0, s.hitstop - dt);
+    return;
+  }
   const p = s.player;
   s.interactHint = null;
   s.ruleSpeedMult = 1;
@@ -532,7 +802,7 @@ export function step(s: EngineState, dt: number) {
     if (siren) {
       const stars = wantedStars(p.wanted);
       if (stars > s.ruleCd.wantedSirenLevel || s.t - s.ruleCd.sirenAt > 4) {
-        playSirenSafe();
+        playSirenSafe(s);
         s.ruleCd.sirenAt = s.t;
         s.ruleCd.wantedSirenLevel = stars;
       }
@@ -567,8 +837,7 @@ export function step(s: EngineState, dt: number) {
     }
     s.targetZoom = zoomTargets(s.profile, "indoor");
     s.camZoom += (s.targetZoom - s.camZoom) * s.profile.zoom.lerp;
-    s.camX = p.x;
-    s.camY = p.y;
+    followCam(s, dt, 10);
     return;
   }
 
@@ -609,6 +878,21 @@ export function step(s: EngineState, dt: number) {
         });
         if (s.dust.length > 80) s.dust.splice(0, s.dust.length - 80);
       }
+      s.footCd = (s.footCd ?? 0) - dt;
+      const sprint = key(s, "ShiftLeft", "ShiftRight");
+      if (s.footCd <= 0) {
+        playJuice(s, "foot", sprint ? 1.08 : 0.92);
+        s.footCd = sprint ? 0.22 : 0.32;
+      }
+      if (!s.wasMoving) s.squash = Math.min(1, s.squash + 0.25);
+      s.wasMoving = true;
+    } else {
+      if (s.wasMoving) {
+        s.squash = Math.min(1, s.squash + 0.4);
+        burstDust(s, p.x, p.y, 8);
+        burstRing(s, p.x, p.y, "#c4b89a", 0.22);
+      }
+      s.wasMoving = false;
     }
     s.underOverhang = s.footings.some((f) => actorUnderOverhang(p.x, p.y, f));
     const veh = nearestVehicle(s);
@@ -643,6 +927,26 @@ export function step(s: EngineState, dt: number) {
           (key(s, "KeyA", "ArrowLeft") ? -1 : 0) +
           (key(s, "KeyD", "ArrowRight") ? 1 : 0);
         v.rot += steer * ENGINE.steerRate * (v.speed / max) * dt;
+        if (Math.abs(steer) > 0 && Math.abs(v.speed) > 45 && Math.random() < 0.45) {
+          s.skids.push({ x: v.x, y: v.y, rot: v.rot, life: 0.85 });
+          if (s.skids.length > 48) s.skids.splice(0, s.skids.length - 48);
+        }
+      }
+      const boosting = key(s, "ShiftLeft", "ShiftRight") && Math.abs(v.speed) > 28;
+      if (boosting && !s.wasBoosting) playJuice(s, "boost", 1.05);
+      s.wasBoosting = boosting;
+      if (boosting && Math.random() < 0.55) {
+        s.boostTrail.push({
+          x: v.x - Math.cos(v.rot) * 14,
+          y: v.y - Math.sin(v.rot) * 14,
+          rot: v.rot,
+          life: 0.22,
+        });
+        if (s.boostTrail.length > 28) s.boostTrail.splice(0, s.boostTrail.length - 28);
+      }
+      if (key(s, "Space") && Math.abs(v.speed) > 30 && Math.random() < 0.5) {
+        s.skids.push({ x: v.x, y: v.y, rot: v.rot, life: 0.7 });
+        if (Math.random() < 0.35) playJuice(s, "skid", 0.95, v.x);
       }
       const nx = v.x + Math.cos(v.rot) * v.speed * dt;
       const ny = v.y + Math.sin(v.rot) * v.speed * dt;
@@ -658,7 +962,10 @@ export function step(s: EngineState, dt: number) {
       s.props = ram.props;
       if (ram.hit) {
         s.smashFlash = 0.2;
-        s.shake = Math.max(s.shake, 0.12);
+        const destroyed = before.some(
+          (bp) => !bp.gone && s.props.find((x) => x.id === bp.id)?.gone,
+        );
+        juiceImpact(s, v.x, v.y, destroyed);
         p.wanted = Math.min(5, p.wanted + 0.08);
         v.speed *= 0.85;
         noteDestroyed(s, before, s.props);
@@ -697,13 +1004,16 @@ export function step(s: EngineState, dt: number) {
   stepHeat(s, dt);
 
   p.wanted = Math.max(0, p.wanted - ENGINE.wantedDecay * dt);
+  const driveSpeed = p.vehicleId
+    ? Math.abs(s.vehicles.find((v) => v.id === p.vehicleId)?.speed ?? 0)
+    : 0;
+  const boosting = s.wasBoosting && p.mode === "drive";
   s.targetZoom =
     p.mode === "drive"
-      ? zoomTargets(s.profile, "drive")
+      ? zoomTargets(s.profile, "drive") * (boosting ? 0.86 : 1)
       : zoomTargets(s.profile, "foot");
   s.camZoom += (s.targetZoom - s.camZoom) * s.profile.zoom.lerp;
-  s.camX = p.x;
-  s.camY = p.y;
+  followCam(s, dt, p.mode === "drive" ? 46 + driveSpeed * 0.32 : 18);
   p.x = Math.max(8, Math.min(s.worldW - 8, p.x));
   p.y = Math.max(8, Math.min(s.worldH - 8, p.y));
 }

@@ -17,10 +17,12 @@ import {
   Layers,
   Bomb,
   GitBranch,
+  Zap,
 } from "lucide-react";
 import { useStudio } from "@/store/studio";
 import { WIRE_CATEGORY_META } from "@/lib/engine/templates";
 import type { WireCategory } from "@/lib/pixel/types";
+import { TRIGGER_KINDS, TRIGGER_META, type WireTriggerKind } from "@/lib/wires/triggers";
 import { cn } from "@/lib/utils";
 
 const CONNECTORS: { id: WireCategory; Icon: React.ComponentType<{ size?: number }> }[] = [
@@ -55,6 +57,8 @@ export function WirePalette() {
   const project = useStudio((s) => s.engineProject);
   const beginWire = useStudio((s) => s.beginWireConnect);
   const activeZone = useStudio((s) => s.activeWireZoneId);
+  const zones = useStudio((s) => s.wireZones);
+  const zone = zones.find((z) => z.id === activeZone) ?? null;
   const setShowEngine = useStudio((s) => s.setShowEngineConnect);
   const activeParallax = useStudio((s) => s.activeParallaxId);
   const wireParallax = useStudio((s) => s.wireParallaxStack);
@@ -78,7 +82,7 @@ export function WirePalette() {
         type="button"
         title="Show wire connectors"
         onClick={() => setOpen(true)}
-        className="absolute bottom-10 left-2 z-20 flex h-9 items-center gap-1.5 rounded-[var(--radius-md)] border border-border bg-bg-elevated/95 px-2.5 text-[11px] font-medium text-muted shadow-lg backdrop-blur hover:text-fg"
+        className="absolute bottom-10 left-2 z-30 flex h-9 items-center gap-1.5 rounded-[var(--radius-md)] border border-border bg-bg-elevated/95 px-2.5 text-[11px] font-medium text-muted shadow-lg backdrop-blur hover:text-fg"
       >
         <Cable size={14} className="text-accent" />
         Wires
@@ -88,7 +92,7 @@ export function WirePalette() {
   }
 
   return (
-    <div className="absolute bottom-10 left-2 z-20 flex max-w-[min(100%,360px)] flex-col gap-1.5 rounded-[var(--radius-md)] border border-border bg-bg-elevated/95 p-2 shadow-xl backdrop-blur-md">
+    <div className="absolute bottom-10 left-2 z-30 flex max-w-[min(100%,360px)] flex-col gap-1.5 rounded-[var(--radius-md)] border border-border bg-bg-elevated/95 p-2 shadow-xl backdrop-blur-md">
       <div className="flex items-center justify-between gap-2 px-0.5">
         <div className="flex items-center gap-1.5 text-[11px] font-semibold text-fg">
           <Cable size={13} className="text-accent" />
@@ -190,6 +194,61 @@ export function WirePalette() {
           Wire active plane → {WIRE_CATEGORY_META[active].label} folder
         </button>
       )}
+
+      <div className="mt-0.5 border-t border-border/60 pt-1.5">
+        <div className="mb-1 flex items-center gap-1 px-0.5 text-[10px] font-semibold text-fg">
+          <Zap size={11} className="text-accent" />
+          Triggers
+          {zone?.trigger?.kind && zone.trigger.kind !== "none" && (
+            <span className="font-normal text-muted">
+              · {TRIGGER_META[zone.trigger.kind as WireTriggerKind].short}
+              {zone.trigger.armed ? " armed" : " off"}
+            </span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {TRIGGER_KINDS.map((k) => {
+            const m = TRIGGER_META[k];
+            const on = zone?.trigger?.kind === k;
+            return (
+              <button
+                key={k}
+                type="button"
+                title={m.hint}
+                className={cn(
+                  "rounded border px-1.5 py-0.5 text-[9px] font-semibold",
+                  on
+                    ? "border-transparent text-bg"
+                    : "border-border/70 text-muted hover:text-fg",
+                )}
+                style={on ? { background: m.color, borderColor: m.color } : undefined}
+                onClick={() => {
+                  if (!zone) {
+                    useStudio.getState().setStatus("Select a feed plane, then arm a trigger");
+                    return;
+                  }
+                  const next = on ? "none" : k;
+                  useStudio.getState().setZoneTrigger(zone.id, next, true);
+                }}
+              >
+                {m.short}
+              </button>
+            );
+          })}
+          {zone && zone.trigger?.kind && zone.trigger.kind !== "none" && (
+            <button
+              type="button"
+              className="rounded border border-accent/40 bg-accent/15 px-1.5 py-0.5 text-[9px] font-semibold text-fg"
+              onClick={() => useStudio.getState().fireZoneTrigger(zone.id)}
+            >
+              Fire
+            </button>
+          )}
+        </div>
+        <p className="mt-1 px-0.5 text-[9px] leading-snug text-subtle">
+          Arm a plane → click the badge or press T. Valve (dot) opens / closes the flow.
+        </p>
+      </div>
     </div>
   );
 }

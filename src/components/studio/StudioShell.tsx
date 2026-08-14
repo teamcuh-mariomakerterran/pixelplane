@@ -31,12 +31,17 @@ import { PaletteGravityBar } from "./PaletteGravityBar";
 import { TimelineStrip } from "./TimelineStrip";
 import { KernelOverlays } from "./KernelOverlays";
 import { RuleCardsPanel } from "./RuleCardsPanel";
+import { ShaderGraphPanel } from "./ShaderGraphPanel";
+import { MutationRailsPanel } from "./MutationRailsPanel";
+import { CategoryPlanePanel } from "./CategoryPlanePanel";
+import { CraftLabPanel } from "./CraftLabPanel";
 import { useSpatialNav } from "@/store/spatial-nav";
 import { usePlaneSystems } from "@/store/plane-systems";
 import { useMemoryWeb } from "@/store/memory-web";
 import { loadSnapshot, pickSnapshot, saveSnapshot, snapshotMissingFoundations } from "@/lib/pixel/persist";
 import { isBufferHollow } from "@/lib/pixel/buffer";
 import { useCollab } from "@/store/collab";
+import { unlockAudio } from "@/lib/audio/juice";
 import {
   eventToChord,
   chordKey,
@@ -200,6 +205,7 @@ export function StudioShell() {
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
+      unlockAudio();
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
 
@@ -217,6 +223,13 @@ export function StudioShell() {
       if (e.key === "Escape" && usePlaneSystems.getState().maskTool) {
         e.preventDefault();
         usePlaneSystems.getState().cancelMask();
+        return;
+      }
+
+      // T — fire the selected feed plane's armed trigger
+      if (e.code === "KeyT" && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        useStudio.getState().fireZoneTrigger();
         return;
       }
 
@@ -338,9 +351,12 @@ export function StudioShell() {
     };
     window.addEventListener("keydown", onKeyDown);
     window.addEventListener("keyup", onKeyUp);
+    const unlock = () => unlockAudio();
+    window.addEventListener("pointerdown", unlock);
     return () => {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("pointerdown", unlock);
     };
   }, []);
 
@@ -394,6 +410,10 @@ function AppModeRoot({ ready }: { ready: boolean }) {
           <TimelineStrip />
           <KernelOverlays />
           <RuleCardsPanel />
+          <ShaderGraphPanel />
+          <MutationRailsPanel />
+          <CategoryPlanePanel />
+          <CraftLabPanel />
           <CommandPalette />
           <SharedPlaneHost />
           <SharedPlanePanel />

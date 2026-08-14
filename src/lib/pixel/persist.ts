@@ -88,7 +88,10 @@ export async function clearSnapshot(): Promise<void> {
   db.close();
 }
 
-/** Build snapshot from studio getState() plain fields */
+/** Build snapshot from studio getState() plain fields.
+ *  Large starter-pack bitmaps are NOT stored — only sourceUrl + geometry.
+ *  Pixels rehydrate on boot via rehydrateStarterArt (fixes hollow Neon Alley etc).
+ */
 export function pickSnapshot(state: {
   meta: unknown;
   camera: unknown;
@@ -112,16 +115,19 @@ export function pickSnapshot(state: {
   activeParticleId?: string | null;
   activeParallaxId?: string | null;
 }): PersistedSnapshot {
+  const artboards = slimArtboards(state.artboards);
+  const parallaxStacks = slimParallax(state.parallaxStacks);
+  const animRegions = slimAnims(state.animRegions);
   return {
     version: 2,
     savedAt: Date.now(),
     meta: state.meta,
     camera: state.camera,
-    artboards: state.artboards,
-    animRegions: state.animRegions,
+    artboards,
+    animRegions,
     particles: state.particles,
     actors: state.actors,
-    parallaxStacks: state.parallaxStacks,
+    parallaxStacks,
     wireZones: state.wireZones,
     engineProject: state.engineProject,
     activeArtboardId: state.activeArtboardId,
@@ -137,6 +143,110 @@ export function pickSnapshot(state: {
     activeParticleId: state.activeParticleId ?? null,
     activeParallaxId: state.activeParallaxId ?? null,
   };
+}
+
+function layerHasPixels(data: unknown, w: number, h: number): boolean {
+  if (!data) return false;
+  const need = (w | 0) * (h | 0) * 4;
+  if (need <= 0) return false;
+  const len =
+    typeof (data as { length?: number }).length === "number"
+      ? (data as { length: number }).length
+      : typeof (data as { byteLength?: number }).byteLength === "number"
+        ? (data as { byteLength: number }).byteLength
+        : 0;
+  if (len < Math.min(need, 64)) return false;
+  // sample alpha channel
+  try {
+    const arr =
+      data instanceof Uint8ClampedArray
+        ? data
+        : data instanceof Uint8Array
+          ? data
+          : null;
+    if (!arr) return len >= need;
+    let opaque = 0;
+    const step = Math.max(4, ((arr.length / 4 / 2000) | 0) * 4);
+    for (let i = 3; i < arr.length; i += step) {
+      if (arr[i]! > 8) {
+        opaque++;
+        if (opaque > 8) return true;
+      }
+    }
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+function slimArtboards(raw: unknown): unknown {
+  if (!Array.isArray(raw)) return [];
+  // Keep real pixels in IDB so refresh never depends on re-fetch.
+  // Only strip truly empty / enormous buffers. Starter boards are <1MB each.
+  const MAX_BYTES = 3_000_000;
+  return raw.map((b: any) => {
+    const w = b.width | 0;
+    const h = b.height | 0;
+    const layers = (b.layers || []).map((l: any) => {
+      const data = l.data;
+      const len =
+        data && typeof data.length === "number"
+          ? data.length
+          : data && typeof data.byteLength === "number"
+            ? data.byteLength
+            : 0;
+      if (len > 0 && len <= MAX_BYTES && layerHasPixels(data, w, h)) {
+        // persist a dense copy so IDB structured-clone stays solid
+        const copy =
+          data instanceof Uint8ClampedArray
+            ? new Uint8ClampedArray(data)
+            : new Uint8ClampedArray(data as ArrayLike<number>);
+        return { ...l, data: copy };
+      }
+      // hollow — keep geometry + sourceUrl for rehydrate
+      return { ...l, data: new Uint8ClampedArray(0) };
+    });
+    return { ...b, layers };
+  });
+}
+
+function slimParallax(raw: unknown): unknown {
+  if (!Array.isArray(raw)) return [];
+  const MAX_BYTES = 3_000_000;
+  return raw.map((p: any) => ({
+    ...p,
+    layers: (p.layers || []).map((L: any) => {
+      const data = L.data;
+      const w = L.w | 0;
+      const h = L.h | 0;
+      const len = data && typeof data.length === "number" ? data.length : 0;
+      if (len > 0 && len <= MAX_BYTES && layerHasPixels(data, w, h)) {
+        const copy =
+          data instanceof Uint8ClampedArray
+            ? new Uint8ClampedArray(data)
+            : new Uint8ClampedArray(data as ArrayLike<number>);
+        return { ...L, data: copy };
+      }
+      const { data: _d, ...rest } = L;
+      return { ...rest, data: undefined };
+    }),
+  }));
+}
+
+function slimAnims(raw: unknown): unknown {
+  if (!Array.isArray(raw)) return [];
+  // keep anim structure; frames can be rebuilt from boards if hollow
+  return raw.map((a: any) => ({
+    ...a,
+    frames: (a.frames || []).map((f: any) => ({
+      ...f,
+      // keep small frames; strip if huge
+      data:
+        f.data && f.data.length && f.data.length <= 96 * 96 * 4
+          ? f.data
+          : new Uint8ClampedArray(0),
+    })),
+  }));
 }
 
 /** True when a restored v1/partial save lost smash alley / quest foundations */

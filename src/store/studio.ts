@@ -228,6 +228,10 @@ export type StudioState = {
   deleteWireZone: (id: string) => void;
   moveWireZone: (id: string, x: number, y: number) => void;
   renameWireZone: (id: string, name: string) => void;
+  setZoneTrigger: (id: string, kind: string, armed?: boolean) => void;
+  armZoneTrigger: (id: string, armed: boolean) => void;
+  fireZoneTrigger: (id?: string | null) => void;
+  fireArmedTriggers: (kind?: string) => number;
   beginWireConnect: (opts: any) => void;
   assignWireDestination: (opts: any) => void;
   addAssetFolder: (parentId: string, name: string, category?: WireCategory) => string | null;
@@ -1527,7 +1531,8 @@ export const useStudio = create<StudioState>((set, get) => ({
       color: meta.color,
       enabled: true,
       questTreeId,
-      destructibleId
+      destructibleId,
+      trigger: { kind: "none", armed: false },
     };
     if (questTreeId) set((s) => ({ questTrees: s.questTrees.map((q) => q.id === questTreeId ? {
         ...q,
@@ -1565,6 +1570,94 @@ export const useStudio = create<StudioState>((set, get) => ({
       ...z,
       name
     } : z) })),
+  setZoneTrigger: (id, kind, armed) => {
+    set((s) => ({
+      wireZones: s.wireZones.map((z) =>
+        z.id === id
+          ? {
+              ...z,
+              trigger: {
+                kind,
+                armed: kind === "none" ? false : armed ?? true,
+                lastFiredAt: z.trigger?.lastFiredAt,
+              },
+            }
+          : z,
+      ),
+      status:
+        kind === "none"
+          ? "Trigger cleared"
+          : `Trigger armed · ${String(kind).replace("_", " ")} · T to fire`,
+    }));
+  },
+  armZoneTrigger: (id, armed) => {
+    set((s) => ({
+      wireZones: s.wireZones.map((z) =>
+        z.id === id && z.trigger
+          ? { ...z, trigger: { ...z.trigger, armed } }
+          : z.id === id
+            ? { ...z, trigger: { kind: "none", armed } }
+            : z,
+      ),
+      status: armed ? "Trigger valve open" : "Trigger valve closed",
+    }));
+  },
+  fireZoneTrigger: (id) => {
+    const s = get();
+    const zone = s.wireZones.find((z) => z.id === (id || s.activeWireZoneId));
+    if (!zone) {
+      set({ status: "No feed plane selected" });
+      return;
+    }
+    const kind = zone.trigger?.kind ?? "none";
+    if (kind === "none") {
+      set({ status: "Plane has no trigger — arm one on the wire strip" });
+      return;
+    }
+    if (zone.trigger && !zone.trigger.armed) {
+      set({ status: "Valve closed · click the valve to arm" });
+      return;
+    }
+    void import("@/lib/wires/fire").then(({ fireWireAction }) => {
+      fireWireAction(zone, kind);
+    });
+    set((st) => ({
+      wireZones: st.wireZones.map((z) =>
+        z.id === zone.id
+          ? {
+              ...z,
+              trigger: { ...(z.trigger ?? { kind, armed: true }), lastFiredAt: Date.now() },
+            }
+          : z,
+      ),
+    }));
+  },
+  fireArmedTriggers: (kind) => {
+    const s = get();
+    let n = 0;
+    const hits = [];
+    for (const z of s.wireZones) {
+      if (!z.trigger?.armed) continue;
+      if (kind && z.trigger.kind !== kind) continue;
+      if (z.trigger.kind === "none") continue;
+      hits.push(z);
+      n++;
+    }
+    if (n) {
+      void import("@/lib/wires/fire").then(({ fireWireAction }) => {
+        for (const z of hits) fireWireAction(z, z.trigger.kind);
+      });
+      set((st) => ({
+        wireZones: st.wireZones.map((z) =>
+          z.trigger?.armed && (!kind || z.trigger.kind === kind)
+            ? { ...z, trigger: { ...z.trigger, lastFiredAt: Date.now() } }
+            : z,
+        ),
+        status: `Fired ${n} armed plane${n === 1 ? "" : "s"}`,
+      }));
+    }
+    return n;
+  },
   beginWireConnect: (opts) => {
     if (!get().engineProject) {
       set({
@@ -1975,7 +2068,10 @@ export const useStudio = create<StudioState>((set, get) => ({
       particles: snap.particles ?? [],
       actors: snap.actors ?? [],
       parallaxStacks,
-      wireZones: snap.wireZones ?? [],
+      wireZones: (snap.wireZones ?? []).map((z: { trigger?: unknown }) => ({
+        ...z,
+        trigger: z.trigger ?? { kind: "none", armed: false },
+      })),
       engineProject: snap.engineProject ?? null,
       questTrees,
       destructibles,

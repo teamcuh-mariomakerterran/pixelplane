@@ -94,7 +94,8 @@ export function stepHeat(s: EngineState, dt: number) {
   }
 }
 
-/** Street decor billboards fed from plane pack URLs. */
+/** Street decor billboards fed from plane pack URLs — each entry is a SHEET;
+ *  CityEngineView slices a single cell so we don't draw whole contact sheets. */
 export type StreetDecor = {
   id: string;
   x: number;
@@ -103,6 +104,8 @@ export type StreetDecor = {
   h: number;
   url: string;
   label: string;
+  /** which cell in the sheet (stable per decor) */
+  cellIndex: number;
 };
 
 const DECOR_URLS = [
@@ -113,6 +116,10 @@ const DECOR_URLS = [
   "/packs/goodies/citykit/factories_color_plants.jpg",
   "/packs/goodies/citykit/apartments_purple_neon.jpg",
   "/packs/goodies/citykit/roads_elevated_highway.jpg",
+  "/packs/goodies/citykit/cars_neon_topdown.jpg",
+  "/packs/goodies/citykit/cars_weaponized.jpg",
+  "/packs/goodies/citykit/buildings_neon_fronts.jpg",
+  "/packs/goodies/citykit/cars_clean_damaged.jpg",
   "/packs/goodies/citykit/hangars_warehouse_front.jpg",
 ];
 
@@ -123,19 +130,40 @@ export function spawnStreetDecor(
   worldH: number,
 ): StreetDecor[] {
   const out: StreetDecor[] = [];
+  // ring of unique sheet cells around the player — not whole sheets
   for (let i = 0; i < DECOR_URLS.length; i++) {
     const ang = (i / DECOR_URLS.length) * Math.PI * 2;
-    const dist = 140 + (i % 3) * 90;
+    const dist = 120 + (i % 4) * 70;
     const x = Math.max(40, Math.min(worldW - 80, px + Math.cos(ang) * dist));
     const y = Math.max(40, Math.min(worldH - 80, py + Math.sin(ang) * dist));
+    // world footprint of a single prop (not the sheet)
+    const isVehicle = /cars|vehicles|police/i.test(DECOR_URLS[i]!);
     out.push({
       id: `decor_${i}`,
       x,
       y,
-      w: 48 + (i % 3) * 12,
-      h: 36 + (i % 2) * 10,
+      w: isVehicle ? 42 : 56,
+      h: isVehicle ? 28 : 48,
       url: DECOR_URLS[i]!,
       label: DECOR_URLS[i]!.split("/").pop()?.replace(".jpg", "") ?? "decor",
+      cellIndex: i % 6, // variety across cells in each sheet
+    });
+  }
+  // second ring — more cells from same sheets
+  for (let i = 0; i < 8; i++) {
+    const ang = (i / 8) * Math.PI * 2 + 0.4;
+    const dist = 320 + (i % 3) * 40;
+    const url = DECOR_URLS[i % DECOR_URLS.length]!;
+    const isVehicle = /cars|vehicles|police/i.test(url);
+    out.push({
+      id: `decor_r2_${i}`,
+      x: Math.max(40, Math.min(worldW - 80, px + Math.cos(ang) * dist)),
+      y: Math.max(40, Math.min(worldH - 80, py + Math.sin(ang) * dist)),
+      w: isVehicle ? 40 : 52,
+      h: isVehicle ? 26 : 44,
+      url,
+      label: url.split("/").pop()?.replace(".jpg", "") ?? "decor",
+      cellIndex: (i + 2) % 8,
     });
   }
   return out;

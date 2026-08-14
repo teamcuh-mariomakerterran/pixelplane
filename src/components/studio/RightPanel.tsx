@@ -29,6 +29,7 @@ import { saveSnapshot, pickSnapshot, clearSnapshot } from "@/lib/pixel/persist";
 import { formatChord } from "@/lib/hotkeys/defaults";
 import { ANIM_LIBRARY_PRESETS } from "@/lib/anim-lab/doctrine";
 import { scopeForZone, formatScopeSummary } from "@/lib/spatial/scope";
+import { getParticleStats } from "@/lib/pixel/particles-draw";
 import { resolveSpatialOwner } from "@/lib/spatial/priority";
 import { centerOf } from "@/lib/spatial/scope";
 import { useSpatialNav } from "@/store/spatial-nav";
@@ -128,12 +129,32 @@ export function RightPanel() {
               type="button"
               className="rounded-[var(--radius-sm)] border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-[10px] font-semibold text-sky-200 hover:bg-sky-500/20"
               onClick={() => {
-                void useStudio.getState().rehydrateStarterArt().then((r) => {
+                void (async () => {
+                  try {
+                    const { clearPlaneBlitCaches } = await import(
+                      "@/components/studio/CanvasWorkspace"
+                    );
+                    clearPlaneBlitCaches();
+                  } catch {
+                    /* */
+                  }
+                  const r = await useStudio.getState().rehydrateStarterArt();
                   useStudio.getState().focusDemoHome();
+                  try {
+                    const { clearPlaneBlitCaches } = await import(
+                      "@/components/studio/CanvasWorkspace"
+                    );
+                    clearPlaneBlitCaches();
+                  } catch {
+                    /* */
+                  }
                   void saveSnapshot(pickSnapshot(useStudio.getState()));
-                });
+                  useStudio.getState().setStatus(
+                    `Art reloaded · ${r.fixed}/${r.total} boards refreshed`,
+                  );
+                })();
               }}
-              title="Re-download starter-pack pixels into empty boards"
+              title="Force re-download starter-pack pixels into boards (fixes MISSING PIXELS)"
             >
               Reload art
             </button>
@@ -275,6 +296,57 @@ export function RightPanel() {
                   )}
                 </div>
               )}
+              <div className="space-y-1 rounded border border-border/70 bg-surface/50 px-2 py-1.5">
+                <div className="text-[9px] font-semibold uppercase tracking-wider text-muted">
+                  Trigger
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {(["boil", "tile_kit", "qa", "mutate", "bloom"] as const).map((k) => {
+                    const on = wire.trigger?.kind === k;
+                    return (
+                      <button
+                        key={k}
+                        type="button"
+                        className={cn(
+                          "rounded border px-1.5 py-0.5 text-[9px] font-semibold capitalize",
+                          on
+                            ? "border-accent/50 bg-accent/15 text-fg"
+                            : "border-border text-muted hover:text-fg",
+                        )}
+                        onClick={() =>
+                          useStudio
+                            .getState()
+                            .setZoneTrigger(wire.id, on ? "none" : k, true)
+                        }
+                      >
+                        {k.replace("_", " ")}
+                      </button>
+                    );
+                  })}
+                </div>
+                {wire.trigger?.kind && wire.trigger.kind !== "none" && (
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      className="flex-1 rounded border border-accent/40 bg-accent/15 py-1 text-[10px] font-semibold text-fg"
+                      onClick={() => useStudio.getState().fireZoneTrigger(wire.id)}
+                    >
+                      Fire T
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded border border-border px-2 py-1 text-[10px] text-muted hover:text-fg"
+                      onClick={() =>
+                        useStudio
+                          .getState()
+                          .armZoneTrigger(wire.id, !wire.trigger?.armed)
+                      }
+                    >
+                      {wire.trigger.armed ? "Valve open" : "Valve shut"}
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="flex gap-1">
                 <button
                   type="button"
@@ -320,7 +392,7 @@ export function RightPanel() {
               <span
                 className={cn(
                   "h-2 w-2 rounded-full",
-                  b.kind === "scene" ? "bg-success" : b.kind === "hud" ? "bg-cyan" : "bg-accent",
+                  b.kind === "scene" ? "bg-success" : b.kind === "hud" ? "bg-cyan" : b.kind === "variant" ? "bg-accent" : "bg-accent",
                 )}
               />
               <span className="flex-1 truncate">{b.name}</span>
@@ -622,6 +694,15 @@ export function RightPanel() {
         </Section>
 
         <Section title="Particles" icon={<Sparkles size={12} />}>
+          {(() => {
+            const st = getParticleStats();
+            return (
+              <p className="px-3 py-1 text-[10px] text-subtle">
+                LOD {st.lod.toFixed(2)} · {st.drawn}/{st.emitters} drawn · {st.motes} motes
+                {st.culled ? ` · ${st.culled} culled` : ""}
+              </p>
+            );
+          })()}
           {particles.map((p) => (
             <button
               key={p.id}

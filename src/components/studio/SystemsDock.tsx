@@ -18,8 +18,14 @@ import {
   Lamp,
   GitBranch,
   ScrollText,
+  Aperture,
+  Library,
+  Waves,
 } from "lucide-react";
 import { useRuleCards } from "@/store/rule-cards";
+import { useShaderGraph } from "@/store/shader-graph";
+import { useCategoryPlanes } from "@/store/category-planes";
+import { useCraftLab } from "@/store/craft-lab";
 import { cn } from "@/lib/utils";
 
 /**
@@ -43,6 +49,14 @@ export function SystemsDock() {
   const diffOn = useSignature((s) => s.diffEnabled);
   const ruleN = useRuleCards((s) => s.cards.length);
   const rulesShow = useRuleCards((s) => s.showOnPlane);
+  const shaderN = useShaderGraph((s) => s.graphs.length);
+  const shaderShow = useShaderGraph((s) => s.showOnPlane);
+  const railN = useSignature((s) => s.links.length);
+  const railsShow = useSignature((s) => s.showRailsPanel);
+  const catShow = useCategoryPlanes((s) => s.showPanel);
+  const catN = useCategoryPlanes((s) => s.planes.length);
+  const craftShow = useCraftLab((s) => s.showPanel);
+  const boilOn = useCraftLab((s) => s.boilOn);
 
   return (
     <div className="pointer-events-none absolute left-2 top-14 z-[45] flex max-w-[220px] flex-col gap-1.5">
@@ -162,11 +176,53 @@ export function SystemsDock() {
             <Lamp size={12} /> Lantern
           </DockBtn>
           <DockBtn
-            active={false}
-            title="Mutation rails — spawn neon/dusk/silhouette/chrome variants"
-            onClick={() => useSignature.getState().spawnMutationRails()}
+            active={railsShow && railN > 0}
+            title="Mutation rails — live variants from the active board"
+            onClick={() => {
+              const sig = useSignature.getState();
+              if (!sig.links.length) {
+                sig.spawnMutationRails();
+                return;
+              }
+              const next = !sig.showRailsPanel;
+              sig.setShowRailsPanel(next);
+              useStudio
+                .getState()
+                .setStatus(next ? "Mutation rails inspector" : "Rails inspector hidden");
+            }}
           >
-            <GitBranch size={12} /> Mutate
+            <GitBranch size={12} /> Mutate {railN || ""}
+          </DockBtn>
+          <DockBtn
+            active={catShow}
+            title="Asset planes — open a wired category workspace"
+            onClick={() => {
+              const c = useCategoryPlanes.getState();
+              c.setShowPanel(!c.showPanel);
+              useStudio
+                .getState()
+                .setStatus(
+                  !c.showPanel
+                    ? "Asset planes · pick vehicles, buildings, UI…"
+                    : "Asset planes hidden",
+                );
+            }}
+          >
+            <Library size={12} /> Library {catN || ""}
+          </DockBtn>
+          <DockBtn
+            active={craftShow || boilOn}
+            title="Craft lab — boil, tile kit, sprite QA"
+            onClick={() => {
+              const c = useCraftLab.getState();
+              const next = !c.showPanel;
+              c.setShowPanel(next);
+              useStudio
+                .getState()
+                .setStatus(next ? "Craft lab · boil / tiles / QA" : "Craft lab hidden");
+            }}
+          >
+            <Waves size={12} /> Craft
           </DockBtn>
           <DockBtn
             active={rulesShow && ruleN > 0}
@@ -186,6 +242,24 @@ export function SystemsDock() {
             }}
           >
             <ScrollText size={12} /> Rules {ruleN || ""}
+          </DockBtn>
+          <DockBtn
+            active={shaderShow && shaderN > 0}
+            title="Shader lab — Neon CRT node graph · click to seed / toggle"
+            onClick={() => {
+              const g = useShaderGraph.getState();
+              if (!g.graphs.length) {
+                g.seedLab(true);
+                return;
+              }
+              const next = !g.showOnPlane;
+              g.setShowOnPlane(next);
+              useStudio
+                .getState()
+                .setStatus(next ? "Shader lab visible" : "Shader lab hidden");
+            }}
+          >
+            <Aperture size={12} /> Shader {shaderN || ""}
           </DockBtn>
         </div>
         <div className="mt-1 px-1 text-[9px] text-subtle">

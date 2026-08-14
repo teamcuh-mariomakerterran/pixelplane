@@ -15,6 +15,8 @@ import {
   wantedStars,
   type EngineState,
 } from "@/lib/city-engine/sim";
+import { unlockAudio } from "@/lib/audio/juice";
+import { tickCityAmbience, stopCityAmbience, ambienceLabel } from "@/lib/audio/ambience";
 import { propLabel } from "@/lib/city-engine/world-props";
 import { indoorFromArtboard } from "@/lib/city-engine/indoors";
 import { ENGINE, CONTROLS_HELP, VEHICLE_DEFS } from "@/lib/city-engine/config";
@@ -37,7 +39,58 @@ import { useSignature } from "@/store/signature";
 import { useRuleCards } from "@/store/rule-cards";
 import { compositeLayers } from "@/lib/pixel/buffer";
 import { FX_EXPLOSIONS } from "@/lib/icon-library/pixel-packs";
-import { ArrowLeft, Crosshair, Car, Building2, ScrollText, Ghost, Star } from "lucide-react";
+import { getDecorCellCanvases, clearDecorCellCache } from "@/lib/city-engine/sheet-cells";
+import { useShaderGraph } from "@/store/shader-graph";
+import {
+  compileGraph,
+  createShaderPreview,
+  graphFingerprint,
+  migrateGraph,
+  type ShaderGraph,
+  type ShaderPreviewHandle,
+} from "@/lib/shaders/graph";
+import { ArrowLeft, Crosshair, Car, Building2, ScrollText, Ghost, Star, Aperture } from "lucide-react";
+
+let engineGradeScratch: HTMLCanvasElement | null = null;
+let engineGradeSlot: { key: string; handle: ShaderPreviewHandle } | null = null;
+
+function applyEngineGrade(
+  canvas: HTMLCanvasElement,
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  dpr: number,
+  graph: ShaderGraph,
+  time: number,
+) {
+  const g = migrateGraph(graph);
+  const pw = Math.min(960, Math.max(320, Math.round(w)));
+  const ph = Math.min(540, Math.max(200, Math.round(h)));
+  const fp = `${graphFingerprint(g)}@${pw}x${ph}`;
+  if (!engineGradeSlot || engineGradeSlot.key !== fp) {
+    engineGradeSlot?.handle.dispose();
+    const { frag } = compileGraph(g);
+    const handle = createShaderPreview(pw, ph, frag);
+    if (!handle) return;
+    engineGradeSlot = { key: fp, handle };
+  }
+  if (!engineGradeScratch) engineGradeScratch = document.createElement("canvas");
+  const sc = engineGradeScratch;
+  if (sc.width !== canvas.width || sc.height !== canvas.height) {
+    sc.width = canvas.width;
+    sc.height = canvas.height;
+  }
+  const sctx = sc.getContext("2d");
+  if (!sctx) return;
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.drawImage(canvas, 0, 0);
+  const amounts: Record<string, number> = {};
+  for (const n of g.nodes) amounts[n.kind] = n.amount;
+  engineGradeSlot.handle.draw(sc, time, amounts);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(engineGradeSlot.handle.canvas, 0, 0, w, h);
+}
 
 /**
  * PixelPlane City Engine — original top-down sandbox.
@@ -58,6 +111,7 @@ export function CityEngineView() {
       usePlaneSystems.getState().commitPlayGhost(done);
     }
     useStudio.getState().setAppMode("studio");
+    stopCityAmbience();
   };
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef<EngineState>(createEngineState("topdown_openworld"));
@@ -82,8 +136,12 @@ export function CityEngineView() {
     profile: "Top-down open world",
     questDone: false,
     rules: 0,
+    combo: 0,
+    boosting: false,
+    amb: "street",
   });
   const [ready, setReady] = useState(false);
+  const enginePost = useShaderGraph((s) => s.enginePost);
 
   useEffect(() => {
     boomFrames.current = FX_EXPLOSIONS.v2.map((src) => {
@@ -169,7 +227,8 @@ export function CityEngineView() {
       }
       spawnStarterVehicles(s);
       spawnWorldProps(s);
-      // preload decor images from plane packs
+      clearDecorCellCache();
+      // preload decor images from plane packs (sliced to single cells at draw time)
       for (const d of s.decor) {
         if (!decorImgs.current.has(d.url)) {
           const im = new Image();
@@ -229,6 +288,7 @@ export function CityEngineView() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      unlockAudio();
       const s = stateRef.current;
       if (e.code === "Escape") {
         e.preventDefault();
@@ -254,9 +314,12 @@ export function CityEngineView() {
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKey);
+    const unlock = () => unlockAudio();
+    window.addEventListener("pointerdown", unlock);
     return () => {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKey);
+      window.removeEventListener("pointerdown", unlock);
     };
   }, []);
 
@@ -274,6 +337,19 @@ export function CityEngineView() {
       last = now;
       const s = stateRef.current;
       step(s, dt);
+      tickCityAmbience({
+        listenerX: s.camX,
+        wanted: s.player.wanted,
+        driving: s.player.mode === "drive",
+        indoor: s.realm === "indoor",
+        dayPhase: s.dayPhase,
+        speed:
+          s.player.mode === "drive"
+            ? Math.abs(
+                s.vehicles.find((v) => v.id === s.player.vehicleId)?.speed ?? 0,
+              )
+            : 0,
+      });
       if (Math.floor(s.t * 2) !== Math.floor((s.t - dt) * 2)) {
         const payloads = useMemoryWeb.getState().pollSockets();
         for (const p of payloads) {
@@ -329,18 +405,28 @@ export function CityEngineView() {
       ctx.fillStyle = "#0a0c10";
       ctx.fillRect(0, 0, w, h);
 
-      // camera shake
-      let shakeX = 0;
-      let shakeY = 0;
-      if (s.shake > 0) {
-        const mag = s.shake * 10;
-        shakeX = (Math.random() - 0.5) * mag;
-        shakeY = (Math.random() - 0.5) * mag;
-      }
+      // trauma² shake + slight rotation (Squirrel Eiserloh) — not linear random
+      const reduced =
+        typeof window !== "undefined" &&
+        window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+      const trauma = Math.min(1, s.trauma || 0);
+      const shakeAmt = trauma * trauma * (reduced ? 0.15 : 1);
+      const tn = s.t * 31;
+      const shakeX = shakeAmt * 16 * (Math.sin(tn * 1.7) * 0.62 + Math.sin(tn * 4.1) * 0.38) + (s.kickX || 0);
+      const shakeY = shakeAmt * 16 * (Math.cos(tn * 1.9) * 0.62 + Math.sin(tn * 5.2) * 0.38) + (s.kickY || 0);
+      const shakeRot = shakeAmt * 0.028 * Math.sin(tn * 3.3);
 
-      const z = s.camZoom;
-      const ox = w / 2 - s.camX * z + shakeX;
-      const oy = h / 2 - s.camY * z + shakeY;
+      const punchZ = 1 + (s.punch || 0) * 0.09;
+      const z = s.camZoom * punchZ;
+      const ox = Math.round(w / 2 - s.camX * z + shakeX);
+      const oy = Math.round(h / 2 - s.camY * z + shakeY);
+
+      if (shakeRot) {
+        ctx.save();
+        ctx.translate(w / 2, h / 2);
+        ctx.rotate(shakeRot);
+        ctx.translate(-w / 2, -h / 2);
+      }
 
       if (s.realm === "outdoor" && mapImg.current) {
         ctx.save();
@@ -386,27 +472,66 @@ export function CityEngineView() {
       }
 
       if (s.realm === "outdoor") {
-        // plane-fed street decor (billboards)
+        // tire skids (under everything moving)
+        for (const k of s.skids) {
+          const a = Math.max(0, k.life / 0.85);
+          ctx.save();
+          ctx.translate(ox + k.x * z, oy + k.y * z);
+          ctx.rotate(k.rot);
+          ctx.fillStyle = `rgba(20,18,16,${0.35 * a})`;
+          ctx.fillRect(-10 * z, -3 * z, 18 * z, 2.2 * z);
+          ctx.fillRect(-10 * z, 2 * z, 18 * z, 2.2 * z);
+          ctx.restore();
+        }
+
+        // Street decor: ONE cell from each citykit sheet (never the whole contact sheet)
         for (const d of s.decor) {
+          const fw = Math.min(d.w || 48, 56);
+          const fh = Math.min(d.h || 36, 48);
           const dx = ox + d.x * z;
           const dy = oy + d.y * z;
-          const dw = d.w * z;
-          const dh = d.h * z;
-          // frustum skip
+          const dw = fw * z;
+          const dh = fh * z;
           if (dx + dw < 0 || dy + dh < 0 || dx > w || dy > h) continue;
           const im = decorImgs.current.get(d.url);
-          ctx.fillStyle = "rgba(0,0,0,0.35)";
-          ctx.fillRect(dx - 2, dy - 2, dw + 4, dh + 4);
           if (im && im.complete && im.naturalWidth > 0) {
             ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(im, dx, dy, dw, dh);
+            let cells: HTMLCanvasElement[] = [];
+            try {
+              cells = getDecorCellCanvases(d.url, im);
+            } catch {
+              cells = [];
+            }
+            // Reject any cell that is still basically a contact sheet
+            const safe = cells.filter(
+              (c) =>
+                c.width > 0 &&
+                c.height > 0 &&
+                c.width <= 128 &&
+                c.height <= 128 &&
+                c.width * c.height < im.naturalWidth * im.naturalHeight * 0.15,
+            );
+            const cell = safe.length
+              ? safe[((d as { cellIndex?: number }).cellIndex ?? 0) % safe.length]!
+              : null;
+            if (cell) {
+              const scale = Math.min(dw / cell.width, dh / cell.height);
+              const cw = Math.max(8, Math.min(dw, cell.width * scale));
+              const ch = Math.max(8, Math.min(dh, cell.height * scale));
+              ctx.fillStyle = "rgba(0,0,0,0.35)";
+              ctx.fillRect(dx + (dw - cw) / 2 + 2, dy + (dh - ch) / 2 + 2, cw, ch);
+              ctx.drawImage(cell, dx + (dw - cw) / 2, dy + (dh - ch) / 2, cw, ch);
+            } else {
+              // solid proxy — NEVER drawImage the raw sheet
+              ctx.fillStyle = "rgba(62,207,207,0.4)";
+              ctx.fillRect(dx, dy, dw, dh);
+              ctx.strokeStyle = "rgba(232,168,56,0.5)";
+              ctx.strokeRect(dx, dy, dw, dh);
+            }
           } else {
             ctx.fillStyle = "rgba(62,207,207,0.25)";
             ctx.fillRect(dx, dy, dw, dh);
           }
-          ctx.strokeStyle = "rgba(232,168,56,0.55)";
-          ctx.lineWidth = 1;
-          ctx.strokeRect(dx, dy, dw, dh);
         }
 
         for (const p of s.props) {
@@ -448,6 +573,10 @@ export function CityEngineView() {
               ctx.fillStyle = hpRatio > 0.4 ? "#4ecb71" : "#f97316";
               ctx.fillRect(px - pw / 2, py - ph / 2 - 5, pw * hpRatio, 3);
             }
+            if (s.smashFlash > 0.08) {
+              ctx.fillStyle = `rgba(255,255,255,${s.smashFlash * 0.7})`;
+              ctx.fillRect(px - pw / 2, py - ph / 2, pw, ph);
+            }
           }
         }
 
@@ -463,6 +592,17 @@ export function CityEngineView() {
             s.player.vehicleId,
             isHeat,
           );
+        }
+
+        // boost trail ghosts
+        for (const k of s.boostTrail) {
+          const a = Math.max(0, k.life / 0.22);
+          ctx.save();
+          ctx.translate(ox + k.x * z, oy + k.y * z);
+          ctx.rotate(k.rot);
+          ctx.fillStyle = `rgba(62,207,207,${0.28 * a})`;
+          ctx.fillRect(-12 * z, -5 * z, 22 * z, 10 * z);
+          ctx.restore();
         }
 
         for (const sc of s.indoorScenes) {
@@ -508,6 +648,52 @@ export function CityEngineView() {
           ctx.arc(ox + d.x * z, oy + d.y * z, (2 + a * 2) * z * 0.4, 0, Math.PI * 2);
           ctx.fill();
         }
+
+        // smash shards
+        for (const sh of s.shards ?? []) {
+          const a = Math.max(0, sh.life);
+          ctx.save();
+          ctx.globalAlpha = Math.min(1, a * 2);
+          ctx.translate(ox + sh.x * z, oy + sh.y * z);
+          ctx.rotate(sh.rot);
+          ctx.fillStyle = sh.color;
+          ctx.fillRect((-sh.w / 2) * z, (-sh.h / 2) * z, sh.w * z, sh.h * z);
+          ctx.restore();
+        }
+
+        // impact rings
+        for (const r of s.rings ?? []) {
+          const u = 1 - r.life / r.max;
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, 1 - u) * 0.85;
+          ctx.strokeStyle = r.color;
+          ctx.lineWidth = Math.max(1, (2.4 - u * 1.6) * z);
+          ctx.beginPath();
+          ctx.arc(ox + r.x * z, oy + r.y * z, (8 + u * 46) * z, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // combo / smash pops
+        ctx.font = `${Math.max(10, 12 * z)}px ui-sans-serif, system-ui`;
+        ctx.textAlign = "center";
+        for (const pop of s.pops) {
+          const u = pop.life / pop.max;
+          const scale = 0.7 + (1 - u) * 0.5;
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, Math.min(1, u));
+          ctx.fillStyle = pop.color;
+          ctx.strokeStyle = "rgba(0,0,0,0.65)";
+          ctx.lineWidth = 3;
+          const px = ox + pop.x * z;
+          const py = oy + pop.y * z;
+          ctx.translate(px, py);
+          ctx.scale(scale, scale);
+          ctx.strokeText(pop.text, 0, 0);
+          ctx.fillText(pop.text, 0, 0);
+          ctx.restore();
+        }
+        ctx.textAlign = "start";
 
         // interaction rings (enter / smash)
         {
@@ -561,9 +747,11 @@ export function CityEngineView() {
             heroImg.current.complete;
           if (useHero) {
             const hs = 28 * z;
+            const sq = 1 - (s.squash || 0) * 0.28;
             ctx.save();
             ctx.translate(px, py);
             ctx.rotate(s.player.rot + Math.PI / 2);
+            ctx.scale(1 / sq, sq);
             ctx.imageSmoothingEnabled = false;
             ctx.drawImage(heroImg.current!, -hs / 2, -hs * 0.75, hs, hs);
             ctx.restore();
@@ -572,18 +760,23 @@ export function CityEngineView() {
             ctx.ellipse(px, py + 4 * z, 8 * z, 3 * z, 0, 0, Math.PI * 2);
             ctx.fill();
           } else {
+            const sq = 1 - (s.squash || 0) * 0.35;
+            ctx.save();
+            ctx.translate(px, py);
+            ctx.scale(1 / sq, sq);
             ctx.fillStyle = under ? "#fbbf24" : "#e8a838";
             ctx.beginPath();
-            ctx.arc(px, py, 7, 0, Math.PI * 2);
+            ctx.arc(0, 0, 7, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = "#111";
             ctx.lineWidth = 1.5;
             ctx.stroke();
             ctx.strokeStyle = "#fff";
             ctx.beginPath();
-            ctx.moveTo(px, py);
-            ctx.lineTo(px + Math.cos(s.player.rot) * 12, py + Math.sin(s.player.rot) * 12);
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(s.player.rot) * 12, Math.sin(s.player.rot) * 12);
             ctx.stroke();
+            ctx.restore();
           }
         }
       }
@@ -603,9 +796,44 @@ export function CityEngineView() {
         }
       }
 
+      if (shakeRot) {
+        ctx.restore();
+      }
+
       if (s.smashFlash > 0) {
         ctx.fillStyle = `rgba(255,120,40,${s.smashFlash * 0.25})`;
         ctx.fillRect(0, 0, w, h);
+      }
+
+      // chromatic split on big hits — presentation only
+      const chroma = reduced ? 0 : s.chroma || 0;
+      if (chroma > 0.04) {
+        const split = chroma * 6;
+        ctx.save();
+        ctx.globalCompositeOperation = "screen";
+        ctx.globalAlpha = chroma * 0.28;
+        ctx.fillStyle = "#ff2a4a";
+        ctx.fillRect(split, 0, w, h);
+        ctx.fillStyle = "#2ad4ff";
+        ctx.fillRect(-split, 0, w, h);
+        ctx.restore();
+      }
+
+      // boost speed lines
+      if (hud.boosting || (s.player.mode === "drive" && s.wasBoosting)) {
+        ctx.save();
+        ctx.globalAlpha = 0.28;
+        ctx.strokeStyle = "#3ecfcf";
+        ctx.lineWidth = 1.25;
+        for (let i = 0; i < 14; i++) {
+          const y0 = ((i * 67 + s.t * 420) % (h + 40)) - 20;
+          const x0 = (i * 97) % w;
+          ctx.beginPath();
+          ctx.moveTo(x0, y0);
+          ctx.lineTo(x0 - 28, y0 + 10);
+          ctx.stroke();
+        }
+        ctx.restore();
       }
 
       // heat red edge pulse
@@ -648,6 +876,17 @@ export function CityEngineView() {
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);
 
+      if (useShaderGraph.getState().enginePost) {
+        const graph = useShaderGraph.getState().graphs[0];
+        if (graph?.playing) {
+          try {
+            applyEngineGrade(canvas, ctx, w, h, dpr, graph, s.t);
+          } catch {
+            /* keep raw frame */
+          }
+        }
+      }
+
       hudAcc += dt;
       if (hudAcc > 0.1) {
         hudAcc = 0;
@@ -671,11 +910,17 @@ export function CityEngineView() {
           profile: s.profile.label,
           questDone: !!s.quest?.completed,
           rules: useRuleCards.getState().cards.filter((c) => c.enabled).length,
+          combo: s.combo,
+          boosting: s.player.mode === "drive" && !!(s.keys["ShiftLeft"] || s.keys["ShiftRight"]),
+          amb: ambienceLabel(s.dayPhase, s.realm === "indoor"),
         });
       }
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      stopCityAmbience();
+    };
   }, [ready]);
 
   return (
@@ -690,6 +935,22 @@ export function CityEngineView() {
             className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-black/60 px-2.5 py-1.5 text-xs text-white backdrop-blur hover:bg-black/80"
           >
             <ArrowLeft size={14} /> Studio
+          </button>
+          <button
+            type="button"
+            title="Grade the city with the Shader Lab look"
+            onClick={() => {
+              const st = useShaderGraph.getState();
+              if (!st.graphs[0]) st.seedLab(false);
+              st.setEnginePost(!st.enginePost);
+            }}
+            className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs backdrop-blur ${
+              enginePost
+                ? "border-cyan-400/50 bg-cyan-950/70 text-cyan-200"
+                : "border-white/15 bg-black/60 text-white/80 hover:bg-black/80"
+            }`}
+          >
+            <Aperture size={14} /> {enginePost ? "CRT ON" : "CRT"}
           </button>
           <div className="rounded-md border border-white/10 bg-black/55 px-2.5 py-1.5 backdrop-blur">
             <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">
@@ -747,6 +1008,23 @@ export function CityEngineView() {
             </div>
           )}
           <div className="text-[10px] text-white/45">smashed {hud.smashCount}</div>
+          {hud.combo > 1 && (
+            <div
+              className="mt-0.5 font-mono text-sm font-black text-orange-400"
+              style={{
+                transform: `scale(${1 + Math.min(0.45, hud.combo * 0.04)})`,
+                textShadow: "0 0 12px rgba(251,146,60,0.65)",
+              }}
+            >
+              {hud.combo}× COMBO
+            </div>
+          )}
+          {hud.boosting && (
+            <div className="text-[10px] text-cyan-300">BOOST</div>
+          )}
+          <div className="mt-1 text-[9px] uppercase tracking-wider text-white/40">
+            amb · {hud.amb}
+          </div>
         </div>
       </div>
 

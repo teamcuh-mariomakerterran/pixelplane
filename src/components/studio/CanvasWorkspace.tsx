@@ -13,9 +13,36 @@ import { useCharacterDistrict } from "@/store/character-district";
 import { useCollab } from "@/store/collab";
 import { useMemoryWeb } from "@/store/memory-web";
 import { useSignature } from "@/store/signature";
+import { useCraftLab } from "@/store/craft-lab";
+import { applyBoil, boilFrame } from "@/lib/pixel/boil";
+import { QA_COLORS } from "@/lib/pixel/sprite-qa";
+import {
+  TRIGGER_META,
+  triggerBadgeBox,
+  triggerValveBox,
+  hitBox,
+  type WireTriggerKind,
+} from "@/lib/wires/triggers";
+import { railById } from "@/lib/pixel/mutation-rails";
 import { useSoundSprites } from "@/store/sound-sprites";
 import { useRuleCards, whenLabel, thenLabel } from "@/store/rule-cards";
 import { compositeLayers, bufferToImageData, coercePixelData, isBufferHollow } from "@/lib/pixel/buffer";
+import { getStarterHtmlImage, prefetchStarterImages } from "@/lib/starter-pack";
+import { drawParticleSystem, beginParticleFrame } from "@/lib/pixel/particles-draw";
+import { useShaderGraph } from "@/store/shader-graph";
+import {
+  NODE_META,
+  NODE_W,
+  NODE_H,
+  TITLE_W,
+  TITLE_H,
+  compileGraph,
+  createShaderPreview,
+  createCrtTestCard,
+  graphFingerprint,
+  graphSelfOverlaps,
+  type ShaderPreviewHandle,
+} from "@/lib/shaders/graph";
 import { wireZoneHeat, worldCenterFromCamera } from "@/lib/spatial/wave-a";
 import { zoneWorld, padWorld } from "@/lib/character-district/layout";
 import { CHUNK } from "@/lib/spatial/interest";
@@ -43,7 +70,10 @@ type DragMode =
         | "move-dest"
         | "move-viewport"
         | "move-stamp"
-        | "move-district";
+        | "move-district"
+        | "move-rule"
+        | "move-shader"
+        | "move-shader-node";
       x0: number;
       y0: number;
       lastX: number;
@@ -71,8 +101,47 @@ function hexAlpha(hex: string, a: number) {
   return `rgba(${r},${g},${b},${a})`;
 }
 
+function railColor(id: string) {
+  return railById(id)?.color ?? "#e8a838";
+}
+
+function prefersReducedMotion() {
+  try {
+    return window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches ?? false;
+  } catch {
+    return false;
+  }
+}
+
+const boilScratch: { c: HTMLCanvasElement | null } = { c: null };
+function drawBoil(
+  ctx: CanvasRenderingContext2D,
+  img: ImageData,
+  x: number,
+  y: number,
+) {
+  if (!boilScratch.c) boilScratch.c = document.createElement("canvas");
+  const c = boilScratch.c;
+  if (c.width !== img.width) c.width = img.width;
+  if (c.height !== img.height) c.height = img.height;
+  const tctx = c.getContext("2d");
+  if (!tctx) return;
+  tctx.putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(c, x, y);
+}
+
 const boardCache = new Map<string, { rev: string; canvas: HTMLCanvasElement }>();
 const animCache = new Map<string, { key: string; canvas: HTMLCanvasElement }>();
+const shaderPreviewCache = new Map<
+  string,
+  { key: string; handle: ShaderPreviewHandle }
+>();
+let crtTestCard: HTMLCanvasElement | null = null;
+function getCrtCard() {
+  if (!crtTestCard) crtTestCard = createCrtTestCard(320, 200);
+  return crtTestCard;
+}
 const ghostImgCache = new Map<string, HTMLImageElement>();
 const layerDataCache = new Map<string, { rev: number; canvas: HTMLCanvasElement }>();
 
@@ -81,6 +150,14 @@ export function clearPlaneBlitCaches() {
   boardCache.clear();
   animCache.clear();
   layerDataCache.clear();
+  for (const s of shaderPreviewCache.values()) {
+    try {
+      s.handle.dispose();
+    } catch {
+      /* */
+    }
+  }
+  shaderPreviewCache.clear();
 }
 
 function getLayerDataCanvas(
@@ -125,19 +202,26 @@ function getBoardCanvas(b: {
     opacity: number;
     rev: number;
   }[];
-}) {
+}): HTMLCanvasElement | null {
+  if (!b.width || !b.height) return null;
   const key = boardRevKey(b);
   const hit = boardCache.get(b.id);
   if (hit && hit.rev === key) return hit.canvas;
-  const c = document.createElement("canvas");
-  c.width = b.width;
-  c.height = b.height;
-  const ctx = c.getContext("2d")!;
-  ctx.imageSmoothingEnabled = false;
-  const buf = compositeLayers(b.layers, b.width, b.height);
-  ctx.putImageData(bufferToImageData(buf, b.width, b.height), 0, 0);
-  boardCache.set(b.id, { rev: key, canvas: c });
-  return c;
+  try {
+    const c = document.createElement("canvas");
+    c.width = b.width;
+    c.height = b.height;
+    const ctx = c.getContext("2d");
+    if (!ctx) return null;
+    ctx.imageSmoothingEnabled = false;
+    const buf = compositeLayers(b.layers, b.width, b.height);
+    ctx.putImageData(bufferToImageData(buf, b.width, b.height), 0, 0);
+    boardCache.set(b.id, { rev: key, canvas: c });
+    return c;
+  } catch (err) {
+    console.warn("[getBoardCanvas]", b.id, err);
+    return null;
+  }
 }
 
 function getAnimCanvas(anim: {
@@ -382,6 +466,45 @@ export function CanvasWorkspace() {
             });
           }
         }
+
+        const trig = zone.trigger;
+        if (trig && trig.kind && trig.kind !== "none") {
+          const meta = TRIGGER_META[trig.kind as WireTriggerKind];
+          const badge = triggerBadgeBox(zone, cam.zoom);
+          const valve = triggerValveBox(zone, cam.zoom);
+          const age = trig.lastFiredAt ? (Date.now() - trig.lastFiredAt) / 1000 : 99;
+          const flash = age < 0.7 ? 1 - age / 0.7 : 0;
+          ctx.fillStyle = hexAlpha(meta.color, trig.armed ? 0.22 + flash * 0.45 : 0.08);
+          ctx.fillRect(badge.x, badge.y, badge.w, badge.h);
+          ctx.strokeStyle = hexAlpha(meta.color, trig.armed ? 0.95 : 0.4);
+          ctx.lineWidth = 1 / cam.zoom;
+          ctx.setLineDash(trig.armed ? [] : [3 / cam.zoom, 3 / cam.zoom]);
+          ctx.strokeRect(badge.x, badge.y, badge.w, badge.h);
+          ctx.setLineDash([]);
+          if (cam.zoom > 0.25) {
+            labels.push({
+              text: trig.armed ? meta.short : `${meta.short} · off`,
+              x: cam.x + badge.x * cam.zoom + 4,
+              y: cam.y + (badge.y + badge.h) * cam.zoom - 3,
+              color: hexAlpha(meta.color, 0.95),
+            });
+          }
+          ctx.beginPath();
+          ctx.arc(
+            valve.x + valve.w / 2,
+            valve.y + valve.h / 2,
+            valve.w / 2,
+            0,
+            Math.PI * 2,
+          );
+          ctx.fillStyle = trig.armed
+            ? hexAlpha(meta.color, 0.85 + flash * 0.15)
+            : "rgba(40,44,56,0.9)";
+          ctx.fill();
+          ctx.strokeStyle = hexAlpha(meta.color, 0.9);
+          ctx.lineWidth = 1.2 / cam.zoom;
+          ctx.stroke();
+        }
       }
 
       // Constraint stamps (under art so cage frames sit as guides)
@@ -541,24 +664,47 @@ export function CanvasWorkspace() {
           let lw = 0;
           let lh = 0;
           if (board) {
-            try {
-              c = getBoardCanvas(board);
-              lw = board.width;
-              lh = board.height;
-            } catch {
-              c = null;
+            const layer0 = board.layers?.[0];
+            const boardHollow =
+              !layer0 || isBufferHollow(layer0.data, board.width, board.height);
+            if (!boardHollow) {
+              try {
+                c = getBoardCanvas(board);
+                lw = board.width;
+                lh = board.height;
+              } catch {
+                c = null;
+              }
+            } else if (board.sourceUrl) {
+              // hollow board — blit starter image into a temp canvas for tiling
+              const img = getStarterHtmlImage(board.sourceUrl);
+              if (img && img.complete && img.naturalWidth > 0) {
+                const tc = document.createElement("canvas");
+                tc.width = board.width;
+                tc.height = board.height;
+                const tctx = tc.getContext("2d")!;
+                tctx.imageSmoothingEnabled = false;
+                tctx.drawImage(img, 0, 0, board.width, board.height);
+                c = tc;
+                lw = board.width;
+                lh = board.height;
+              } else {
+                prefetchStarterImages([board.sourceUrl]);
+              }
             }
           }
           if (!c && L.data && (L.w || L.width) && (L.h || L.height)) {
             lw = (L.w || L.width) | 0;
             lh = (L.h || L.height) | 0;
-            c = getLayerDataCanvas(
-              `${px.id}:${L.id}`,
-              L.data,
-              lw,
-              lh,
-              L.rev || 1,
-            );
+            if (!isBufferHollow(L.data, lw, lh)) {
+              c = getLayerDataCanvas(
+                `${px.id}:${L.id}`,
+                L.data,
+                lw,
+                lh,
+                L.rev || 1,
+              );
+            }
           }
           if (c && lw && lh) {
             // tile horizontally so viewport always filled
@@ -639,20 +785,85 @@ export function CanvasWorkspace() {
             ctx.fillRect(b.x, b.y, b.width, b.height);
           }
           try {
-            const c = getBoardCanvas(b);
-            ctx.drawImage(c, b.x, b.y);
-            // flag hollow / failed blit so empty boards are obvious
             const layer = b.layers?.[0];
-            if (layer && isBufferHollow(layer.data, b.width, b.height)) {
+            const hollow =
+              !layer || isBufferHollow(layer.data, b.width, b.height);
+            let painted = false;
+            // PRIMARY for starter art: draw the actual image file. Pixel buffers
+            // are used for editing; they can be hollow after IDB round-trips.
+            // Prefer the live bitmap whenever sourceUrl is set and loaded.
+            if (b.sourceUrl) {
+              const img = getStarterHtmlImage(b.sourceUrl);
+              if (img && img.complete && img.naturalWidth > 0) {
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(
+                  img,
+                  b.x,
+                  b.y,
+                  b.width || img.naturalWidth,
+                  b.height || img.naturalHeight,
+                );
+                painted = true;
+              } else {
+                prefetchStarterImages([b.sourceUrl]);
+              }
+            }
+            // Buffer path: user art / edited boards / sourceUrl not ready yet
+            if (!painted && !hollow) {
+              try {
+                const c = getBoardCanvas(b);
+                if (c && c.width > 0 && c.height > 0) {
+                  ctx.drawImage(c, b.x, b.y);
+                  painted = true;
+                }
+              } catch {
+                painted = false;
+              }
+            }
+            // Live boil — overlay only, never writes the board
+            try {
+              const craft = useCraftLab.getState();
+              const wantBoil =
+                craft.boilOn &&
+                (craft.boilAll ||
+                  b.id === state.activeArtboardId ||
+                  (craft.boilBoardIds?.includes(b.id) ?? false)) &&
+                !prefersReducedMotion() &&
+                b.width * b.height <= 180000;
+              if (wantBoil && !hollow) {
+                const src = compositeLayers(b.layers, b.width, b.height);
+                const frame = boilFrame(tNow, craft.boil.intensity);
+                const boiled = applyBoil(src, b.width, b.height, craft.boil, frame);
+                const img = bufferToImageData(boiled, b.width, b.height);
+                drawBoil(ctx, img, b.x, b.y);
+              }
+            } catch {
+              /* */
+            }
+            // QA overlay
+            try {
+              const craft = useCraftLab.getState();
+              if (craft.qaOn && craft.qaReport && craft.qaReport.boardId === b.id) {
+                for (const hit of craft.qaReport.hits) {
+                  ctx.fillStyle = QA_COLORS[hit.kind] || "#e8a838";
+                  ctx.globalAlpha = 0.85;
+                  ctx.fillRect(b.x + hit.x, b.y + hit.y, 1, 1);
+                  ctx.globalAlpha = 1;
+                }
+              }
+            } catch {
+              /* */
+            }
+            if (!painted) {
               ctx.fillStyle = "rgba(232,60,80,0.2)";
               ctx.fillRect(b.x, b.y, b.width, b.height);
               if (cam.zoom > 0.2) {
                 labels.push({
-                  text: `${b.name} · MISSING PIXELS`,
+                  text: `${b.name} · loading art…`,
                   x: cam.x + b.x * cam.zoom,
                   y: cam.y + b.y * cam.zoom + 14,
-                  color: "rgba(255,120,140,0.95)",
-                  bg: "rgba(40,8,12,0.85)",
+                  color: "rgba(255,200,120,0.95)",
+                  bg: "rgba(40,24,8,0.85)",
                 });
               }
             }
@@ -748,28 +959,48 @@ export function CanvasWorkspace() {
         }
       }
 
-      // Particles
+      // Particles — atlas + LOD + frustum + global cap
+      beginParticleFrame();
+      const fxView = {
+        left: -cam.x / cam.zoom,
+        top: -cam.y / cam.zoom,
+        right: (sw - cam.x) / cam.zoom,
+        bottom: (sh - cam.y) / cam.zoom,
+        zoom: cam.zoom,
+      };
       for (const p of state.particles) {
         const active = p.id === state.activeParticleId;
-        ctx.fillStyle = hexAlpha(p.color || "#2dd4bf", 0.12);
-        ctx.strokeStyle = active ? p.color || "#2dd4bf" : hexAlpha(p.color || "#2dd4bf", 0.55);
-        ctx.lineWidth = 1.25 / cam.zoom;
-        ctx.fillRect(p.x, p.y, p.w, p.h);
-        ctx.strokeRect(p.x, p.y, p.w, p.h);
-        // simple sparkle dots
-        if (p.playing !== false) {
-          const n = 12;
-          const t = Date.now() / 400;
-          ctx.fillStyle = hexAlpha(p.color || "#2dd4bf", 0.7);
-          for (let i = 0; i < n; i++) {
-            const px = p.x + ((Math.sin(t + i * 1.7) * 0.5 + 0.5) * p.w);
-            const py = p.y + ((Math.cos(t * 0.8 + i) * 0.5 + 0.5) * p.h);
-            ctx.fillRect(px, py, 2 / cam.zoom, 2 / cam.zoom);
-          }
+        try {
+          drawParticleSystem(
+            ctx,
+            {
+              id: p.id,
+              x: p.x,
+              y: p.y,
+              w: p.w,
+              h: p.h,
+              kind: p.kind || "magic",
+              color: p.color || "#2dd4bf",
+              playing: p.playing,
+              rate: p.rate,
+              life: p.life,
+            },
+            cam.zoom,
+            performance.now(),
+            fxView,
+          );
+        } catch {
+          ctx.fillStyle = hexAlpha(p.color || "#2dd4bf", 0.12);
+          ctx.fillRect(p.x, p.y, p.w, p.h);
         }
-        if (cam.zoom > 0.3) {
+        if (active) {
+          ctx.strokeStyle = "#e8a838";
+          ctx.lineWidth = 2 / cam.zoom;
+          ctx.strokeRect(p.x - 2 / cam.zoom, p.y - 2 / cam.zoom, p.w + 4 / cam.zoom, p.h + 4 / cam.zoom);
+        }
+        if (cam.zoom > 0.28) {
           labels.push({
-            text: `${p.name || p.kind}`,
+            text: `${p.name || "FX"} · ${p.kind || "magic"}${p.playing === false ? " · paused" : ""}`,
             x: cam.x + p.x * cam.zoom,
             y: cam.y + p.y * cam.zoom - 4,
             color: hexAlpha(p.color || "#2dd4bf", 0.95),
@@ -1141,6 +1372,148 @@ export function CanvasWorkspace() {
         }
       }
 
+      // Shader graphs — node chips + live WebGL CRT preview
+      {
+        const sg = useShaderGraph.getState();
+        if (sg.graphs.some(graphSelfOverlaps)) {
+          sg.migrateAll();
+        }
+        if (sg.showOnPlane) {
+          const tNow = performance.now() / 1000;
+          for (const g of sg.graphs) {
+            const active = g.id === sg.activeId;
+            // title bar
+            const barH = TITLE_H;
+            const titleY = Math.min(...g.nodes.map((n) => n.y)) - TITLE_H - 6;
+            const titleX = Math.min(...g.nodes.map((n) => n.x));
+            const titleW = TITLE_W;
+            ctx.fillStyle = "rgba(0,0,0,0.4)";
+            ctx.fillRect(titleX + 2, titleY + 2, titleW, barH);
+            ctx.fillStyle = active ? "rgba(18,28,36,0.94)" : "rgba(14,20,28,0.88)";
+            ctx.fillRect(titleX, titleY, titleW, barH);
+            ctx.fillStyle = "#3ecfcf";
+            ctx.fillRect(titleX, titleY, 4, barH);
+            ctx.strokeStyle = active ? "#e8a838" : "rgba(62,207,207,0.55)";
+            ctx.lineWidth = (active ? 1.75 : 1) / cam.zoom;
+            ctx.strokeRect(titleX, titleY, titleW, barH);
+
+            // wires — pulse when both ends are live
+            const sorted = [...g.nodes].sort((a, b) => a.x + a.y * 0.2 - (b.x + b.y * 0.2));
+            const pulse = 0.22 + 0.18 * Math.sin(tNow * 3.2);
+            ctx.lineWidth = 1.35 / cam.zoom;
+            for (let i = 0; i < sorted.length - 1; i++) {
+              const a = sorted[i]!;
+              const b = sorted[i + 1]!;
+              if (!a.enabled && !b.enabled) continue;
+              ctx.strokeStyle =
+                a.enabled && b.enabled
+                  ? `rgba(62,207,207,${0.28 + pulse})`
+                  : "rgba(62,207,207,0.16)";
+              ctx.beginPath();
+              ctx.moveTo(a.x + NODE_W, a.y + NODE_H / 2);
+              const mx = (a.x + NODE_W + b.x) / 2;
+              const my = (a.y + b.y) / 2 + Math.sin(tNow * 2 + i) * 4;
+              ctx.quadraticCurveTo(mx, my, b.x, b.y + NODE_H / 2);
+              ctx.stroke();
+            }
+
+            for (const n of g.nodes) {
+              const meta = NODE_META[n.kind];
+              const on = n.enabled;
+              const nActive = n.id === sg.activeNodeId;
+              ctx.fillStyle = "rgba(0,0,0,0.3)";
+              ctx.fillRect(n.x + 2 / cam.zoom, n.y + 2 / cam.zoom, NODE_W, NODE_H);
+              ctx.fillStyle = on ? "rgba(16,22,30,0.94)" : "rgba(16,22,30,0.5)";
+              ctx.fillRect(n.x, n.y, NODE_W, NODE_H);
+              ctx.fillStyle = hexAlpha(meta.color, on ? 0.95 : 0.35);
+              ctx.fillRect(n.x, n.y, 4, NODE_H);
+              ctx.strokeStyle = nActive ? "#e8a838" : hexAlpha(meta.color, on ? 0.7 : 0.3);
+              ctx.lineWidth = (nActive ? 1.75 : 1) / cam.zoom;
+              ctx.strokeRect(n.x, n.y, NODE_W, NODE_H);
+              if (cam.zoom > 0.22) {
+                labels.push({
+                  text: meta.label + (on ? "" : " · off"),
+                  x: cam.x + (n.x + 8) * cam.zoom,
+                  y: cam.y + (n.y + 18) * cam.zoom,
+                  color: hexAlpha(meta.color, on ? 0.95 : 0.45),
+                });
+              }
+            }
+
+            // preview
+            const vx = g.x;
+            const vy = g.y;
+            ctx.fillStyle = "rgba(0,0,0,0.45)";
+            ctx.fillRect(vx + 3, vy + 3, g.viewW, g.viewH);
+            ctx.fillStyle = "#0a0c12";
+            ctx.fillRect(vx, vy, g.viewW, g.viewH);
+            ctx.strokeStyle = active ? "#e8a838" : "rgba(62,207,207,0.6)";
+            ctx.lineWidth = (active ? 2 : 1.25) / cam.zoom;
+            ctx.strokeRect(vx, vy, g.viewW, g.viewH);
+
+            try {
+              const fp = graphFingerprint(g);
+              let slot = shaderPreviewCache.get(g.id);
+              if (!slot || slot.key !== fp) {
+                slot?.handle.dispose();
+                const { frag } = compileGraph(g);
+                const handle = createShaderPreview(g.viewW, g.viewH, frag);
+                if (handle) {
+                  slot = { key: fp, handle };
+                  shaderPreviewCache.set(g.id, slot);
+                } else {
+                  slot = undefined;
+                }
+              }
+              if (slot) {
+                const amounts: Record<string, number> = {};
+                for (const n of g.nodes) amounts[n.kind] = n.amount;
+                let src: CanvasImageSource = getCrtCard();
+                if (g.source !== "card") {
+                  let bestD = 520;
+                  for (const b of state.artboards) {
+                    const d = Math.hypot(
+                      b.x + b.width / 2 - (vx + g.viewW / 2),
+                      b.y + b.height / 2 - (vy + g.viewH / 2),
+                    );
+                    if (d < bestD) {
+                      const c = getBoardCanvas(b);
+                      if (c) {
+                        src = c;
+                        bestD = d;
+                      }
+                    }
+                  }
+                }
+                if (g.playing) slot.handle.draw(src, tNow, amounts);
+                ctx.imageSmoothingEnabled = false;
+                ctx.drawImage(slot.handle.canvas, vx, vy, g.viewW, g.viewH);
+              }
+            } catch {
+              ctx.fillStyle = "rgba(62,207,207,0.12)";
+              ctx.fillRect(vx, vy, g.viewW, g.viewH);
+            }
+
+            if (cam.zoom > 0.18) {
+              labels.push({
+                text: "⠿  " + g.name + (g.playing ? "" : " · paused") + "  · drag",
+                x: cam.x + titleX * cam.zoom,
+                y: cam.y + titleY * cam.zoom - 3,
+                color: "#3ecfcf",
+                bg: "rgba(8,14,20,0.8)",
+              });
+              labels.push({
+                text: `src ${g.source === "nearest" ? "board" : "CRT"}`,
+                x: cam.x + (vx + 6) * cam.zoom,
+                y: cam.y + (vy + g.viewH - 4) * cam.zoom,
+                color: "rgba(232,168,56,0.9)",
+                bg: "rgba(8,14,20,0.7)",
+              });
+            }
+          }
+        }
+      }
+
       ctx.restore();
 
       // Screen-space labels
@@ -1271,6 +1644,40 @@ export function CanvasWorkspace() {
         }
       }
 
+      // Mutation rails — parent→child tethers + rail tags
+      {
+        const sig = useSignature.getState();
+        if (sig.links.length) {
+          const boards = state.artboards;
+          for (const link of sig.links) {
+            const parent = boards.find((b) => b.id === link.parentId);
+            const child = boards.find((b) => b.id === link.childId);
+            if (!parent || !child) continue;
+            const px = cam.x + (parent.x + parent.width) * cam.zoom;
+            const py = cam.y + (parent.y + parent.height / 2) * cam.zoom;
+            const cx = cam.x + child.x * cam.zoom;
+            const cy = cam.y + (child.y + child.height / 2) * cam.zoom;
+            const color = railColor(link.railId);
+            ctx.strokeStyle = hexAlpha(color, 0.55);
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.moveTo(px, py);
+            const midX = (px + cx) / 2;
+            ctx.bezierCurveTo(midX, py, midX, cy, cx, cy);
+            ctx.stroke();
+            if (cam.zoom > 0.28) {
+              labels.push({
+                text: `${link.name}${link.live ? "" : " · frozen"} · ${Math.round(link.amount * 100)}`,
+                x: cam.x + child.x * cam.zoom,
+                y: cam.y + child.y * cam.zoom - 16,
+                color: hexAlpha(color, 0.95),
+                bg: "rgba(12,14,18,0.75)",
+              });
+            }
+          }
+        }
+      }
+
       // Hover pixel crosshair hint
       if (state.hoverPixel && cam.zoom > 2) {
         const hx = cam.x + state.hoverPixel.worldX * cam.zoom;
@@ -1343,24 +1750,128 @@ export function CanvasWorkspace() {
       return;
     }
 
-    // Select / move hits
+    const startDrag = (
+      kind: NonNullable<DragMode>["kind"],
+      id: string,
+      ox: number,
+      oy: number,
+    ) => {
+      dragRef.current = {
+        kind,
+        x0: wx,
+        y0: wy,
+        lastX: wx,
+        lastY: wy,
+        targetId: id,
+        ox,
+        oy,
+      };
+    };
+
+    // Plane windows — always grabbable, even with brush/fill active
+    {
+      const sg = useShaderGraph.getState();
+      if (sg.showOnPlane) {
+        for (let gi = sg.graphs.length - 1; gi >= 0; gi--) {
+          const g = sg.graphs[gi]!;
+          for (let ni = g.nodes.length - 1; ni >= 0; ni--) {
+            const n = g.nodes[ni]!;
+            if (wx >= n.x && wx <= n.x + NODE_W && wy >= n.y && wy <= n.y + NODE_H) {
+              sg.select(g.id, n.id);
+              startDrag("move-shader-node", `${g.id}|${n.id}`, n.x, n.y);
+              return;
+            }
+          }
+          const titleY = Math.min(...g.nodes.map((n) => n.y)) - TITLE_H - 6;
+          const titleX = Math.min(...g.nodes.map((n) => n.x));
+          const inPreview =
+            wx >= g.x && wx <= g.x + g.viewW && wy >= g.y && wy <= g.y + g.viewH;
+          const inTitle =
+            wx >= titleX &&
+            wx <= titleX + TITLE_W &&
+            wy >= titleY &&
+            wy <= titleY + TITLE_H;
+          if (inPreview || inTitle) {
+            sg.select(g.id, null);
+            startDrag("move-shader", g.id, g.x, g.y);
+            return;
+          }
+        }
+      }
+    }
+    {
+      const rules = useRuleCards.getState();
+      if (rules.showOnPlane) {
+        const cw = 148;
+        const ch = 78;
+        for (let i = rules.cards.length - 1; i >= 0; i--) {
+          const card = rules.cards[i]!;
+          if (wx >= card.x && wx <= card.x + cw && wy >= card.y && wy <= card.y + ch) {
+            rules.select(card.id);
+            startDrag("move-rule", card.id, card.x, card.y);
+            return;
+          }
+        }
+      }
+    }
+
+    // Select / move hits — boards and props; zones last
     if (tool === "select" || tool === "move") {
-      // viewports
+      for (const p of state.particles) {
+        if (wx >= p.x && wx <= p.x + p.w && wy >= p.y && wy <= p.y + p.h) {
+          state.selectParticle(p.id);
+          startDrag("move-particle", p.id, p.x, p.y);
+          return;
+        }
+      }
+
+      for (const d of state.destructibles) {
+        if (wx >= d.x && wx <= d.x + d.w && wy >= d.y && wy <= d.y + d.h) {
+          state.selectDestructible(d.id);
+          startDrag("move-dest", d.id, d.x, d.y);
+          return;
+        }
+      }
+
+      for (const a of state.animRegions) {
+        if (wx >= a.x && wx <= a.x + a.frameW && wy >= a.y && wy <= a.y + a.frameH) {
+          state.selectAnim(a.id);
+          startDrag("move-anim", a.id, a.x, a.y);
+          return;
+        }
+      }
+
+      for (const actor of state.actors) {
+        const anim = state.animRegions.find((a) => a.id === actor.animId);
+        const fw = (anim?.frameW ?? 16) * (actor.scale ?? 1);
+        const fh = (anim?.frameH ?? 16) * (actor.scale ?? 1);
+        if (wx >= actor.x && wx <= actor.x + fw && wy >= actor.y && wy <= actor.y + fh) {
+          startDrag("move-actor", actor.id, actor.x, actor.y);
+          return;
+        }
+      }
+
+      const board = hitArtboard(wx, wy);
+      if (board) {
+        state.selectArtboard(board.id);
+        startDrag("move-board", board.id, board.x, board.y);
+        return;
+      }
+
+      for (const p of state.parallaxStacks) {
+        if (wx >= p.x && wx <= p.x + p.viewW && wy >= p.y && wy <= p.y + p.viewH) {
+          state.selectParallax(p.id);
+          startDrag("move-parallax", p.id, p.x, p.y);
+          return;
+        }
+      }
+
       const wave = useWaveA.getState();
       for (let i = wave.gameViewports.length - 1; i >= 0; i--) {
         const vp = wave.gameViewports[i]!;
         if (wx >= vp.x && wx <= vp.x + vp.w && wy >= vp.y && wy <= vp.y + vp.h) {
           wave.selectViewport(vp.id);
-          dragRef.current = {
-            kind: "move-viewport",
-            x0: wx,
-            y0: wy,
-            lastX: wx,
-            lastY: wy,
-            targetId: vp.id,
-            ox: vp.x,
-            oy: vp.y,
-          };
+          startDrag("move-viewport", vp.id, vp.x, vp.y);
           return;
         }
       }
@@ -1370,78 +1881,49 @@ export function CanvasWorkspace() {
         const shH = st.pixelH * st.scale;
         if (wx >= st.x && wx <= st.x + swW && wy >= st.y && wy <= st.y + shH) {
           wave.setActiveStamp(st.id);
-          dragRef.current = {
-            kind: "move-stamp",
-            x0: wx,
-            y0: wy,
-            lastX: wx,
-            lastY: wy,
-            targetId: st.id,
-            ox: st.x,
-            oy: st.y,
-          };
+          startDrag("move-stamp", st.id, st.x, st.y);
           return;
         }
       }
-      // districts
+
       const dists = useCharacterDistrict.getState().districts;
       for (let i = dists.length - 1; i >= 0; i--) {
         const d = dists[i]!;
         if (wx >= d.x && wx <= d.x + d.w && wy >= d.y && wy <= d.y + d.h) {
           useCharacterDistrict.getState().selectDistrict(d.id);
-          if (tool === "move") {
-            dragRef.current = {
-              kind: "move-district",
-              x0: wx,
-              y0: wy,
-              lastX: wx,
-              lastY: wy,
-              targetId: d.id,
-              ox: d.x,
-              oy: d.y,
-            };
-          }
+          startDrag("move-district", d.id, d.x, d.y);
           return;
         }
       }
-      for (const d of state.destructibles) {
-        if (wx >= d.x && wx <= d.x + d.w && wy >= d.y && wy <= d.y + d.h) {
-          state.selectDestructible(d.id);
-          if (tool === "move") {
-            dragRef.current = {
-              kind: "move-dest",
-              x0: wx,
-              y0: wy,
-              lastX: wx,
-              lastY: wy,
-              targetId: d.id,
-              ox: d.x,
-              oy: d.y,
-            };
-          }
-          return;
-        }
-      }
+
       for (const q of state.questTrees) {
         if (wx >= q.x && wx <= q.x + q.w && wy >= q.y && wy <= q.y + q.h) {
           state.selectQuestTree(q.id);
-          if (tool === "move") {
-            dragRef.current = {
-              kind: "move-quest",
-              x0: wx,
-              y0: wy,
-              lastX: wx,
-              lastY: wy,
-              targetId: q.id,
-              ox: q.x,
-              oy: q.y,
-            };
+          if (tool === "move" || grab) {
+            startDrag("move-quest", q.id, q.x, q.y);
           }
           return;
         }
       }
+
+      // Wire zones last — huge AABBs used to swallow every window on top
       for (const z of state.wireZones) {
         if (wx >= z.x && wx <= z.x + z.w && wy >= z.y && wy <= z.y + z.h) {
+          const zoom = state.camera.zoom || 1;
+          if (z.trigger && z.trigger.kind !== "none") {
+            const badge = triggerBadgeBox(z, zoom);
+            const valve = triggerValveBox(z, zoom);
+            if (hitBox(badge, wx, wy)) {
+              state.selectWireZone(z.id);
+              state.fireZoneTrigger(z.id);
+              return;
+            }
+            if (hitBox(valve, wx, wy)) {
+              state.selectWireZone(z.id);
+              state.armZoneTrigger(z.id, !z.trigger.armed);
+              return;
+            }
+          }
           state.selectWireZone(z.id);
           if (state.activeConnector) {
             state.beginWireConnect({
@@ -1451,112 +1933,18 @@ export function CanvasWorkspace() {
               screenY: e.clientY,
             });
           }
-          if (tool === "move") {
-            dragRef.current = {
-              kind: "move-zone",
-              x0: wx,
-              y0: wy,
-              lastX: wx,
-              lastY: wy,
-              targetId: z.id,
-              ox: z.x,
-              oy: z.y,
-            };
+          const edge =
+            wx < z.x + 14 ||
+            wx > z.x + z.w - 14 ||
+            wy < z.y + 14 ||
+            wy > z.y + z.h - 14;
+          if (tool === "move" || edge) {
+            startDrag("move-zone", z.id, z.x, z.y);
           }
           return;
         }
       }
-      for (const p of state.parallaxStacks) {
-        if (wx >= p.x && wx <= p.x + p.viewW && wy >= p.y && wy <= p.y + p.viewH) {
-          state.selectParallax(p.id);
-          if (tool === "move") {
-            dragRef.current = {
-              kind: "move-parallax",
-              x0: wx,
-              y0: wy,
-              lastX: wx,
-              lastY: wy,
-              targetId: p.id,
-              ox: p.x,
-              oy: p.y,
-            };
-          }
-          return;
-        }
-      }
-      for (const a of state.animRegions) {
-        if (wx >= a.x && wx <= a.x + a.frameW && wy >= a.y && wy <= a.y + a.frameH) {
-          state.selectAnim(a.id);
-          if (tool === "move") {
-            dragRef.current = {
-              kind: "move-anim",
-              x0: wx,
-              y0: wy,
-              lastX: wx,
-              lastY: wy,
-              targetId: a.id,
-              ox: a.x,
-              oy: a.y,
-            };
-          }
-          return;
-        }
-      }
-      for (const p of state.particles) {
-        if (wx >= p.x && wx <= p.x + p.w && wy >= p.y && wy <= p.y + p.h) {
-          state.selectParticle(p.id);
-          if (tool === "move") {
-            dragRef.current = {
-              kind: "move-particle",
-              x0: wx,
-              y0: wy,
-              lastX: wx,
-              lastY: wy,
-              targetId: p.id,
-              ox: p.x,
-              oy: p.y,
-            };
-          }
-          return;
-        }
-      }
-      for (const actor of state.actors) {
-        const anim = state.animRegions.find((a) => a.id === actor.animId);
-        const fw = (anim?.frameW ?? 16) * (actor.scale ?? 1);
-        const fh = (anim?.frameH ?? 16) * (actor.scale ?? 1);
-        if (wx >= actor.x && wx <= actor.x + fw && wy >= actor.y && wy <= actor.y + fh) {
-          if (tool === "move") {
-            dragRef.current = {
-              kind: "move-actor",
-              x0: wx,
-              y0: wy,
-              lastX: wx,
-              lastY: wy,
-              targetId: actor.id,
-              ox: actor.x,
-              oy: actor.y,
-            };
-          }
-          return;
-        }
-      }
-      const board = hitArtboard(wx, wy);
-      if (board) {
-        state.selectArtboard(board.id);
-        if (tool === "move") {
-          dragRef.current = {
-            kind: "move-board",
-            x0: wx,
-            y0: wy,
-            lastX: wx,
-            lastY: wy,
-            targetId: board.id,
-            ox: board.x,
-            oy: board.y,
-          };
-        }
-        return;
-      }
+
       state.selectArtboard(null);
       return;
     }
@@ -1794,6 +2182,28 @@ export function CanvasWorkspace() {
       state.moveActor(drag.targetId, Math.round((drag.ox ?? 0) + dx), Math.round((drag.oy ?? 0) + dy));
     } else if (drag.kind === "move-particle" && drag.targetId) {
       state.moveParticle(drag.targetId, Math.round((drag.ox ?? 0) + dx), Math.round((drag.oy ?? 0) + dy));
+    } else if (drag.kind === "move-rule" && drag.targetId) {
+      useRuleCards.getState().moveCard(
+        drag.targetId,
+        Math.round((drag.ox ?? 0) + dx),
+        Math.round((drag.oy ?? 0) + dy),
+      );
+    } else if (drag.kind === "move-shader" && drag.targetId) {
+      useShaderGraph.getState().moveGraph(
+        drag.targetId,
+        Math.round((drag.ox ?? 0) + dx),
+        Math.round((drag.oy ?? 0) + dy),
+      );
+    } else if (drag.kind === "move-shader-node" && drag.targetId) {
+      const [gid, nid] = drag.targetId.split("|");
+      if (gid && nid) {
+        useShaderGraph.getState().moveNode(
+          gid,
+          nid,
+          Math.round((drag.ox ?? 0) + dx),
+          Math.round((drag.oy ?? 0) + dy),
+        );
+      }
     } else if (drag.kind === "move-parallax" && drag.targetId) {
       state.moveParallax(drag.targetId, Math.round((drag.ox ?? 0) + dx), Math.round((drag.oy ?? 0) + dy));
     } else if (drag.kind === "move-dest" && drag.targetId) {
@@ -1844,11 +2254,35 @@ export function CanvasWorkspace() {
     const drag = dragRef.current;
     dragRef.current = null;
     if (!drag) return;
+    if (
+      (drag.kind === "paint" || drag.kind === "shape") &&
+      drag.artboardId
+    ) {
+      useSignature.getState().scheduleRebuke(drag.artboardId);
+    }
     const state = useStudio.getState();
     const rect = canvas!.getBoundingClientRect();
     const sx = e.clientX - rect.left;
     const sy = e.clientY - rect.top;
     const { x: wx, y: wy } = screenToWorld(sx, sy);
+
+    // click-to-toggle shader nodes (no real drag)
+    if (drag.kind === "move-shader-node" && drag.targetId) {
+      const moved = Math.hypot(wx - drag.x0, wy - drag.y0);
+      if (moved < 5) {
+        const [gid, nid] = drag.targetId.split("|");
+        if (gid && nid) {
+          const g = useShaderGraph.getState().graphs.find((x) => x.id === gid);
+          const n = g?.nodes.find((x) => x.id === nid);
+          if (n && n.kind !== "input_tex" && n.kind !== "input_time" && n.kind !== "output") {
+            useShaderGraph.getState().toggleNode(gid, nid);
+            useStudio.getState().setStatus(
+              `Shader · ${n.name} ${n.enabled ? "off" : "on"}`,
+            );
+          }
+        }
+      }
+    }
 
     if (drag.kind === "mask") {
       usePlaneSystems.getState().commitMask();

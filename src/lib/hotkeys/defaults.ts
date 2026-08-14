@@ -288,7 +288,7 @@ export const FEATURE_TIPS: Record<string, FeatureTip> = {
   },
   mutation_rails: {
     title: "Mutation rails",
-    body: "Spawn neon / dusk / silhouette / chrome variants from the active board — cohesion without re-rolling AI.",
+    body: "Spawn live neon / dusk / silhouette / chrome variants — plus ink, 8-bit crush, 2× scale, neon bloom. Paint the base; children follow.",
     creative: "Pick a rail and keep iterating. The plane remembers the lineage.",
   },
   diff_lantern: {

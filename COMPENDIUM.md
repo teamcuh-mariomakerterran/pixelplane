@@ -150,6 +150,51 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 
 ## 3. Changelog (newest first)
 
+### 2026-08-13 — City ambient beds
+- Continuous rumble, neon hum, wind, indoor room tone (own bus — smash duck doesn't kill the street).
+- Day/night morph (dawn / day / dusk / night). Traffic pass-bys with doppler + pan sweep. Distant horns. Night neon ticks.
+- Drive wind scales with speed. Leave engine fades beds out.
+
+### 2026-08-13 — Granular SFX + spatial pan
+- Grain clouds: Hann windows, random buffer offset, playbackRate jitter, crackle buffer.
+- StereoPanner from world X vs camera (smash left = left ear).
+- City ambience bed: sparse grains, denser/hotter with wanted, indoor vs street.
+- Smash / hit / skid / boost / foot all go through grains + pan.
+
+### 2026-08-13 — Audit + audio feedback layers
+- Typecheck clean. No new silent stubs. COMPENDIUM Sound-as-sprite marked shipped.
+- Juice mixer: master/sfx buses, first-gesture unlock, visibility resume, voice cap.
+- Layered SFX: smash (thump+crack+click), hit, hop in/out, boost whoosh, footsteps, skid.
+- Pitch/volume jitter so repeats don't robot. Duck on big smash.
+
+### 2026-08-13 — Engine juice wave (rings · shards · hop · boost FOV)
+- Smash: expanding rings, flying shards, RGB split, combo pops.
+- Hop in/out of cars: punch + dust + IN/OUT pop.
+- Stop running: landing puff. Boost: FOV punch + speed lookahead.
+- Pixel-snapped camera, squash on hero sprite, bigger combo HUD.
+- Presentation only — sim outcomes unchanged.
+
+### 2026-08-13 — Wire triggers
+- Every feed plane can arm a trigger: **BOIL / TILE / QA / MUTATE / BLOOM**.
+- Valve (dot) opens or closes flow. Badge click or **T** fires the selected plane.
+- Smash rule card can fire all armed BOIL planes.
+- Tile-kit and category planes auto-arm.
+- **Files:** `lib/wires/triggers.ts`, `lib/wires/fire.ts`, WirePalette strip, inspector Fire.
+
+### 2026-08-13 — Craft lab: boil · tile kit · sprite QA
+- **Boil engine:** live 1px edge jitter (wobble / noise / ripple), bright pixels locked. Preview only — never bakes the board. Craft dock.
+- **Tile kit:** one board → 8 turns/mirrors, 4 worn, 4 edges, 4 corners on a wired kit plane.
+- **Sprite QA:** orphans, alpha bleed, stray singles, off-palette specks with a color overlay.
+- **Files:** `lib/pixel/boil.ts`, `tile-kit.ts`, `sprite-qa.ts`, `store/craft-lab.ts`, `CraftLabPanel.tsx`
+- **Audit:** typecheck + browser this turn
+
+### 2026-08-13 — Mutation rails details + category asset planes
+- **Mutation rails (live):** parent→child links with mix sliders; paint the base and variants re-bake. Core 4 (neon / dusk / silhouette / chrome) plus **ink outline**, **8-bit crush**, **2× nearest scale**, **neon bloom**. Plane tethers + inspector (Mutate dock / Ctrl+K).
+- **Neon bloom bake:** hue-range detect + soft neighbor bleed as a live rail (the atmospheric pass for neon assets).
+- **Category asset planes:** Library dock → pick Vehicles / Buildings / Props / UI / Gear / Items / FX / Roads / Skyline / Bar / Interiors. Matching library sheets land on a **wired edit plane** so you change the box / car / HUD where it lives.
+- **Files:** `lib/pixel/mutation-rails.ts`, `store/signature.ts`, `MutationRailsPanel.tsx`, `lib/packs/category-planes.ts`, `store/category-planes.ts`, `CategoryPlanePanel.tsx`
+- **Audit:** typecheck + browser smoke this turn
+
 ### 2026-08-12 — Autosave foundations fix (smash alley / quests)
 - **Bug:** IndexedDB autosave (v1) never persisted `destructibles` or `questTrees`. After restore, artboards came back but **Smashables alley + Street Heat quest vanished** — “lots missing on canvas.”
 - **Fix:** persist v2 includes smashables + quests + active ids; `applySnapshot` restores them; boot auto-repairs incomplete saves without wiping art.
@@ -538,9 +583,9 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 | Mobile touch polish | **Partial** | Works but desktop-first | Touch targets + pinch zoom |
 | Living collage timeline | **NOT STARTED** | — | §6.1 |
 | Ghost game viewport | **SHIPPED** | tool U · presets · canvas frames · capture PNG | §6.2 |
-| Mutation rails | **NOT STARTED** | — | §6.3 |
+| Mutation rails | **SHIPPED** | live links · 8 rails · inspector · bloom | §6.3 |
 | Palette gravity | **NOT STARTED** | — | §6.4 |
-| Sound-as-sprite | **NOT STARTED** | — | §6.5 |
+| Sound-as-sprite | **SHIPPED** | chips + juice mixer · layered smash/hop/boost/foot | §6.5 |
 | Rule cards | **SHIPPED** | sticky WHEN→THEN · engine live · export JSON | §6.6 |
 | Diff lantern | **SHIPPED** | nearest-neighbor compare + hot overlay | §6.7 |
 | Session ghosts | **SHIPPED** | F-key thumbs · plane ghosts · toggle | §6.8 |
@@ -574,8 +619,14 @@ Brian’s directive (2026-08-01): **do not pick only a few** — implement the f
 
 ### 6.3 Mutation rails (non-destructive variants)
 - **Idea:** Base artboard → child rails (recolor, outline, scale, 8-bit crush); edit base, variants update.
-- **Data:** `MutationRail { parentId, ops[] }` or artboard `kind: "variant"` + ops.
-- **Status:** Planned
+- **Data:** `MutationLink { parentId, childId, railId, ops[], amount, live }` + artboard `kind: "variant"`.
+- **Rails:** neon push · dusk grade · silhouette · chrome rim · ink outline · 8-bit crush · scale 2× · neon bloom.
+- **UI:** Mutate dock + inspector (mix / live / freeze / unlink). Plane tethers tagged with rail + mix.
+- **Status:** Shipped (live re-bake + bloom bake)
+
+### 6.3b Category asset planes
+- **Idea:** New plane wired to a library category (vehicles, buildings, UI…). All matching sheets load there for edit.
+- **Status:** Shipped lite — Library dock + Ctrl+K “Open Vehicles plane” etc.
 
 ### 6.4 Palette gravity
 - **Idea:** Palette anchor node; nearby artboards snap colors toward palette (strength slider).
@@ -810,7 +861,7 @@ Top bar **people** icon → Shared plane:
 Perfect for art teams, friends, or family creating together across cities.
 
 ### 12.12 What’s coming (so users aren’t surprised)
-Timeline-on-canvas, game viewport frames, palette gravity, mutation variants, more playtest mini-games, sound chips, logic cards, wire coverage heatmap — all planned as first-class plane citizens.
+Timeline-on-canvas, game viewport frames, palette gravity, **mutation rails (live)**, category asset planes, more playtest mini-games, sound chips, logic cards, wire coverage heatmap — rails and category planes are first-class plane citizens now.
 
 ---
 
