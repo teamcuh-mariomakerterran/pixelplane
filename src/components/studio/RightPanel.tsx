@@ -170,16 +170,16 @@ export function RightPanel() {
           <HotkeyLocations />
         </Section>
 
-        <Section title="Engine folders" icon={<Cable size={12} />}>
+        <Section title="Play folders" icon={<Cable size={12} />}>
           {!engine && (
             <div className="px-3 py-2">
-              <p className="text-xs text-muted">No engine connected.</p>
+              <p className="text-xs text-muted">No play project yet.</p>
               <button
                 type="button"
                 className="mt-2 w-full rounded-[var(--radius-sm)] bg-accent py-1.5 text-[11px] font-semibold text-accent-fg"
                 onClick={() => useStudio.getState().setShowEngineConnect(true)}
               >
-                Connect project…
+                Name this project…
               </button>
             </div>
           )}
@@ -215,13 +215,6 @@ export function RightPanel() {
                   onClick={() => useStudio.getState().setShowEngineConnect(true)}
                 >
                   Reconfigure
-                </button>
-                <button
-                  type="button"
-                  className="flex-1 rounded-[var(--radius-sm)] bg-accent py-1.5 text-[11px] font-semibold text-accent-fg"
-                  onClick={() => void useStudio.getState().exportEnginePackage()}
-                >
-                  Export ZIP
                 </button>
               </div>
             </>

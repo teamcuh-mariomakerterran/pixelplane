@@ -15,7 +15,8 @@ export type JuiceSfx =
   | "hop_out"
   | "boost"
   | "foot"
-  | "skid";
+  | "skid"
+  | "sizzle";
 
 type Osc = OscillatorType;
 
@@ -441,5 +442,45 @@ export function playJuiceSfx(kind: JuiceSfx, pitch = 1, pan = 0) {
       osc(c, sfxBus, "sawtooth", 660 * p, t0 + 0.12, 0.14, 0.08 * v, L);
       osc(c, sfxBus, "sawtooth", 440 * p, t0 + 0.24, 0.14, 0.08 * v, L);
       break;
+    case "sizzle":
+      spawnGrainCloud(c, sfxBus, t0, {
+        count: 6,
+        span: 0.08,
+        grain: [0.018, 0.045],
+        rate: [1.1, 2.2],
+        peak: 0.028 * v,
+        pan: L,
+        spread: 0.55,
+        hp: 900,
+        lp: 4200,
+        crackle: true,
+      });
+      osc(c, sfxBus, "triangle", 2100 * p, t0, 0.04, 0.018 * v, L);
+      break;
   }
+}
+
+let lastSizzle = 0;
+
+/** Soft edge-sizzle while boil is live. */
+export function tickBoilSizzle(on: boolean, intensity: number) {
+  if (!on) return;
+  const c = ensure();
+  if (!c || !sfxBus || c.state !== "running") return;
+  const now = c.currentTime;
+  const gap = 0.16 - Math.min(0.08, intensity * 0.007);
+  if (now - lastSizzle < gap) return;
+  lastSizzle = now;
+  spawnGrainCloud(c, sfxBus, now, {
+    count: 2 + Math.round(intensity / 4),
+    span: 0.12,
+    grain: [0.02, 0.05],
+    rate: [0.9, 1.8],
+    peak: 0.012 + intensity * 0.0022,
+    pan: (Math.random() * 2 - 1) * 0.4,
+    spread: 0.5,
+    hp: 700,
+    lp: 3800,
+    crackle: true,
+  });
 }

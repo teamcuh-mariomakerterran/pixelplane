@@ -1,32 +1,8 @@
 import { useState } from "react";
 import { Gamepad2, FolderTree, X } from "lucide-react";
 import { useStudio } from "@/store/studio";
-import { PIXEL_SIZE_OPTIONS, engineLabel } from "@/lib/engine/templates";
-import type { EngineId, PixelSizePreset } from "@/lib/pixel/types";
-import { cn } from "@/lib/utils";
-
-const ENGINES: { id: EngineId; blurb: string }[] = [
-  {
-    id: "godot",
-    blurb: "assets/ tree · Parallax2D scenes (scroll_scale) · nearest filter snippet",
-  },
-  {
-    id: "unity",
-    blurb: "Assets/Art · PixelPlaneParallax.cs (LateUpdate / Cinemachine-safe)",
-  },
-  {
-    id: "unreal",
-    blurb: "Content/PixelArt · ScrollFactor component for Paper2D plates",
-  },
-  {
-    id: "gamemaker",
-    blurb: "sprites/ · layer_x/y camera factors + GML helper",
-  },
-  {
-    id: "generic",
-    blurb: "art/ tree + parallax_config.json for any custom pipeline",
-  },
-];
+import { PIXEL_SIZE_OPTIONS } from "@/lib/engine/templates";
+import type { PixelSizePreset } from "@/lib/pixel/types";
 
 export function EngineConnectModal() {
   const open = useStudio((s) => s.showEngineConnect);
@@ -36,7 +12,6 @@ export function EngineConnectModal() {
   const disconnectEngine = useStudio((s) => s.disconnectEngine);
 
   const [name, setName] = useState(connected?.name ?? "My Pixel Game");
-  const [engine, setEngine] = useState<EngineId>(connected?.engine ?? "godot");
   const [root, setRoot] = useState(connected?.rootFolderName ?? "my_pixel_game");
   const [charSize, setCharSize] = useState<PixelSizePreset>(
     (connected?.sizeDefaults.characters as PixelSizePreset) ?? 48,
@@ -44,24 +19,7 @@ export function EngineConnectModal() {
 
   if (!open) return null;
 
-  const treeHint = (() => {
-    try {
-      // artRootPath may not exist — fallback inline
-      const base =
-        engine === "godot"
-          ? "assets"
-          : engine === "unity"
-            ? "Assets/Art"
-            : engine === "unreal"
-              ? "Content/PixelArt"
-              : engine === "gamemaker"
-                ? "sprites"
-                : "art";
-      return `${root}/${base}/characters · animations · environments · parallax · …`;
-    } catch {
-      return `${root}/…`;
-    }
-  })();
+  const treeHint = `${root}/art/characters · animations · environments · interiors · …`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-bg/80 p-4 backdrop-blur-sm">
@@ -77,10 +35,10 @@ export function EngineConnectModal() {
             </div>
             <div>
               <h2 id="engine-connect-title" className="text-sm font-semibold text-fg">
-                Connect game project
+                Play project
               </h2>
               <p className="text-[11px] text-muted">
-                Engine-aware folders + parallax export for Godot, Unity, Unreal, GameMaker
+                Folders on this plane. PixelPlane is the engine — nothing leaves for another one.
               </p>
             </div>
           </div>
@@ -106,28 +64,9 @@ export function EngineConnectModal() {
             />
           </label>
 
-          <div>
-            <span className="text-[10px] font-medium uppercase tracking-wider text-subtle">
-              Engine
-            </span>
-            <div className="mt-1.5 grid gap-2">
-              {ENGINES.map((e) => (
-                <button
-                  key={e.id}
-                  type="button"
-                  onClick={() => setEngine(e.id)}
-                  className={cn(
-                    "flex flex-col items-start rounded-[var(--radius-sm)] border px-3 py-2.5 text-left transition",
-                    engine === e.id
-                      ? "border-accent bg-accent/10 text-fg"
-                      : "border-border bg-surface text-muted hover:border-border-strong hover:text-fg",
-                  )}
-                >
-                  <span className="text-sm font-medium">{engineLabel(e.id)}</span>
-                  <span className="text-[11px] opacity-80">{e.blurb}</span>
-                </button>
-              ))}
-            </div>
+          <div className="rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2.5 text-[11px] leading-relaxed text-muted">
+            Art on the plane is the game. Feed planes sort characters, rooms, and sheets into
+            folders this project already plays. No Godot, Unity, or Unreal destination.
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -166,9 +105,8 @@ export function EngineConnectModal() {
             </div>
             <p className="font-mono text-[10px] leading-relaxed text-muted">{treeHint}</p>
             <p className="mt-1.5 text-[10px] text-subtle">
-              Includes a dedicated <b>parallax/</b> folder (layers · sheets · config). Depth on the
-              canvas exports as Godot scroll_scale, Unity parallaxEffect, Unreal ScrollFactor, or
-              GameMaker layer factors.
+              Includes a dedicated <b>parallax/</b> folder (layers · sheets · depth). The plane
+              plays these directly.
             </p>
           </div>
         </div>
@@ -198,7 +136,7 @@ export function EngineConnectModal() {
               onClick={() =>
                 connectEngine({
                   name,
-                  engine,
+                  engine: "generic",
                   rootFolderName: root,
                   defaultCharacterSize: charSize,
                 })

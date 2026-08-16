@@ -42,7 +42,6 @@ export function TopBar() {
   const undo = useStudio((s) => s.undo);
   const redo = useStudio((s) => s.redo);
   const exportActivePng = useStudio((s) => s.exportActivePng);
-  const exportEnginePackage = useStudio((s) => s.exportEnginePackage);
   const removeBgActive = useStudio((s) => s.removeBgActive);
   const setShowGenerate = useStudio((s) => s.setShowGenerate);
   const setShowHelp = useStudio((s) => s.setShowHelp);
@@ -236,7 +235,7 @@ export function TopBar() {
 
       <div className="flex items-center gap-1">
         <IconBtn
-          title="Connect engine project"
+          title="Play project folders"
           onClick={() => setShowEngine(true)}
           active={!!engine}
         >
@@ -248,9 +247,6 @@ export function TopBar() {
           active={showWire}
         >
           <Cable size={16} />
-        </IconBtn>
-        <IconBtn title="Export engine package" onClick={() => void exportEnginePackage()}>
-          <Download size={16} />
         </IconBtn>
         <IconBtn title="Free-use starter pack" onClick={() => setShowStarter(true)}>
           <PackageOpen size={16} />

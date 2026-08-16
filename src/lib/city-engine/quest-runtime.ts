@@ -165,3 +165,16 @@ export function questHudLine(rt: QuestRuntime | null): string {
   }
   return `${rt.name}: ${o.title}`;
 }
+
+export function emitQuest(
+  s: { quest: QuestRuntime | null; status: string },
+  ev: QuestEvent,
+) {
+  if (!s.quest) return;
+  s.quest = applyQuestEvent(s.quest, ev);
+  const line = questHudLine(s.quest);
+  if (line) s.status = line;
+  if (s.quest.completed) {
+    s.status = `QUEST COMPLETE · ${s.quest.name}`;
+  }
+}

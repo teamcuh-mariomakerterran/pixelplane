@@ -9,6 +9,7 @@ export type ShaderNodeKind =
   | "noise"
   | "scanlines"
   | "chroma"
+  | "disperse"
   | "pixelate"
   | "vignette"
   | "hue"
@@ -31,7 +32,15 @@ export type ShaderNode = {
 
 export type ShaderSource = "card" | "nearest";
 
-export type ShaderPresetId = "neon" | "vhs" | "night" | "acid" | "thermal" | "film";
+export type ShaderPresetId =
+  | "neon"
+  | "vhs"
+  | "night"
+  | "acid"
+  | "thermal"
+  | "film"
+  | "fringe"
+  | "prism";
 
 export type ShaderGraph = {
   id: string;
@@ -54,7 +63,8 @@ export const NODE_META: Record<
   input_time: { label: "Time", color: "#64748b", hint: "Clock" },
   noise: { label: "Noise", color: "#a78bfa", hint: "Film grain" },
   scanlines: { label: "Scan", color: "#22d3ee", hint: "CRT lines" },
-  chroma: { label: "Chroma", color: "#f472b6", hint: "RGB split" },
+  chroma: { label: "Chroma", color: "#f472b6", hint: "Lens CA · radial + anamorphic" },
+  disperse: { label: "Disperse", color: "#e879f9", hint: "Spectral prism · Cauchy IOR" },
   pixelate: { label: "Pixel", color: "#e8a838", hint: "Quantize UV" },
   vignette: { label: "Vignette", color: "#78716c", hint: "Edge darken" },
   hue: { label: "Hue", color: "#4ade80", hint: "Rotate / spin" },
@@ -71,6 +81,7 @@ export const ALL_KINDS: ShaderNodeKind[] = [
   "pixelate",
   "scanlines",
   "chroma",
+  "disperse",
   "glow",
   "vignette",
   "noise",
@@ -100,7 +111,7 @@ export const SHADER_PRESETS: Record<
 > = {
   neon: {
     name: "Neon CRT",
-    hint: "scan · chroma · glow",
+    hint: "scan · lens CA · glow",
     color: "#22d3ee",
     on: { scanlines: 0.5, chroma: 0.38, glow: 0.48, vignette: 0.55, noise: 0.22, crt: 0.42 },
   },
@@ -134,11 +145,25 @@ export const SHADER_PRESETS: Record<
     color: "#94a3b8",
     on: { noise: 0.64, vignette: 0.72, posterize: 0.22, dither: 0.35 },
   },
+  fringe: {
+    name: "Lens Fringe",
+    hint: "radial + anamorphic CA",
+    color: "#fb7185",
+    on: { chroma: 0.92, vignette: 0.38, crt: 0.22 },
+  },
+  prism: {
+    name: "Prism",
+    hint: "8-tap spectrum · Cauchy",
+    color: "#e879f9",
+    on: { disperse: 0.82, glow: 0.32, vignette: 0.36, chroma: 0.18 },
+  },
 };
 
 export const PRESET_ORDER: ShaderPresetId[] = [
   "neon",
   "vhs",
+  "fringe",
+  "prism",
   "night",
   "acid",
   "thermal",
@@ -275,6 +300,7 @@ uniform vec2 uRes;
 uniform float uTime;
 uniform float uScan;
 uniform float uChroma;
+uniform float uDisperse;
 uniform float uPixel;
 uniform float uVignette;
 uniform float uHue;
@@ -300,6 +326,18 @@ vec3 hueShift(vec3 c, float a) {
 
 float hash(vec2 p) {
   return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
+// Visible spectrum 400–700nm → rough sRGB. Ends fade so it doesn't blow white.
+vec3 wl2rgb(float nm) {
+  float t = clamp((nm - 400.0) / 300.0, 0.0, 1.0);
+  vec3 c = vec3(
+    smoothstep(0.12, 0.0, t) * 0.55 + smoothstep(0.42, 0.72, t),
+    sin(clamp((t - 0.04) / 0.72, 0.0, 1.0) * 3.14159265),
+    1.0 - smoothstep(0.08, 0.42, t)
+  );
+  float fade = smoothstep(0.0, 0.07, t) * (1.0 - smoothstep(0.9, 1.0, t));
+  return max(c, 0.0) * fade;
 }
 
 void main() {
@@ -328,10 +366,51 @@ void main() {
   }
 
   vec4 src = texture2D(uTex, uv);
-  ${on.has("chroma") ? `
-  float split = uChroma * 0.014;
-  src.r = texture2D(uTex, uv + vec2(split, 0.0)).r;
-  src.b = texture2D(uTex, uv - vec2(split, 0.0)).b;
+  ${on.has("disperse") ? `
+  // Chromatic dispersion — Cauchy n(λ) ≈ A + B/λ², 8 spectral taps.
+  // Violet bends more than red. Dir = radial (lens fire) + slight prism tilt.
+  {
+    vec2 fromC = uv - 0.5;
+    float r = length(fromC);
+    vec2 rad = r > 0.0008 ? fromC / r : vec2(1.0, 0.0);
+    float ang = uDisperse > 0.68 ? uTime * 0.12 : 0.0;
+    float ca = cos(ang);
+    float sa = sin(ang);
+    vec2 tilt = vec2(0.55, 0.18);
+    vec2 dir = normalize(rad * 0.75 + vec2(tilt.x * ca - tilt.y * sa, tilt.x * sa + tilt.y * ca));
+    float fire = mix(0.45, 1.0, smoothstep(0.08, 0.55, r));
+    float k = uDisperse * 0.012 * fire;
+    vec3 acc = vec3(0.0);
+    vec3 wsum = vec3(0.0);
+    for (int i = 0; i < 8; i++) {
+      float t = float(i) / 7.0;
+      float nm = mix(400.0, 700.0, t);
+      float um = nm * 0.001;
+      // Cauchy: B/λ² relative to green 550nm (mediump-safe in µm)
+      float disp = (1.0 / (um * um) - 3.3058) * k;
+      vec2 suv = uv + dir * disp;
+      vec3 w = wl2rgb(nm);
+      acc += texture2D(uTex, suv).rgb * w;
+      wsum += w;
+    }
+    src.rgb = acc / max(wsum, vec3(0.001));
+  }
+  ` : ""}
+  ${on.has("chroma") && !on.has("disperse") ? `
+  // Lens CA: anamorphic linear + radial fringe (R out, B in, G barely)
+  vec2 cc = uv - 0.5;
+  float r2 = dot(cc, cc);
+  float k = uChroma * 0.016;
+  vec2 off = vec2(k, 0.0) + cc * r2 * k * 2.6;
+  src.r = texture2D(uTex, uv + off).r;
+  src.g = texture2D(uTex, uv + off * 0.12).g;
+  src.b = texture2D(uTex, uv - off).b;
+  ` : ""}
+  ${on.has("chroma") && on.has("disperse") ? `
+  // Micro anamorphic on top of the spectrum
+  float mk = uChroma * 0.006;
+  src.r = mix(src.r, texture2D(uTex, uv + vec2(mk, 0.0)).r, 0.45);
+  src.b = mix(src.b, texture2D(uTex, uv - vec2(mk, 0.0)).b, 0.45);
   ` : ""}
 
   vec3 col = src.rgb;
@@ -452,6 +531,7 @@ export function createShaderPreview(w = 360, h = 220, frag: string): ShaderPrevi
     uTime: gl.getUniformLocation(prog, "uTime"),
     uScan: gl.getUniformLocation(prog, "uScan"),
     uChroma: gl.getUniformLocation(prog, "uChroma"),
+    uDisperse: gl.getUniformLocation(prog, "uDisperse"),
     uPixel: gl.getUniformLocation(prog, "uPixel"),
     uVignette: gl.getUniformLocation(prog, "uVignette"),
     uHue: gl.getUniformLocation(prog, "uHue"),
@@ -483,6 +563,7 @@ export function createShaderPreview(w = 360, h = 220, frag: string): ShaderPrevi
       gl.uniform1f(loc.uTime, time);
       gl.uniform1f(loc.uScan, amounts.scanlines ?? 0);
       gl.uniform1f(loc.uChroma, amounts.chroma ?? 0);
+      gl.uniform1f(loc.uDisperse, amounts.disperse ?? 0);
       gl.uniform1f(loc.uPixel, amounts.pixelate ?? 0);
       gl.uniform1f(loc.uVignette, amounts.vignette ?? 0);
       gl.uniform1f(loc.uHue, amounts.hue ?? 0);

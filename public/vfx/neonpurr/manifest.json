@@ -1,0 +1,10 @@
+{
+  "id": "neonpurr-vfx",
+  "name": "NeonPurr · Gridpaw VFX sheets",
+  "count": 85,
+  "format": "png",
+  "alpha": true,
+  "native": [1168, 784],
+  "kinds": ["explosion", "debris", "spark", "beam", "energy"],
+  "note": "Converted from flattened JPEG checkers. Edge flood-fill punched paper gray; neon + cores kept."
+}

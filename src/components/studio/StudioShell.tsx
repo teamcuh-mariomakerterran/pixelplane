@@ -35,6 +35,9 @@ import { ShaderGraphPanel } from "./ShaderGraphPanel";
 import { MutationRailsPanel } from "./MutationRailsPanel";
 import { CategoryPlanePanel } from "./CategoryPlanePanel";
 import { CraftLabPanel } from "./CraftLabPanel";
+import { AssetVaultPanel } from "./AssetVaultPanel";
+import { InteriorDistrictPanel } from "./InteriorDistrictPanel";
+import { HauntDistrictPanel } from "./HauntDistrictPanel";
 import { useSpatialNav } from "@/store/spatial-nav";
 import { usePlaneSystems } from "@/store/plane-systems";
 import { useMemoryWeb } from "@/store/memory-web";
@@ -414,6 +417,9 @@ function AppModeRoot({ ready }: { ready: boolean }) {
           <MutationRailsPanel />
           <CategoryPlanePanel />
           <CraftLabPanel />
+          <AssetVaultPanel />
+          <InteriorDistrictPanel />
+          <HauntDistrictPanel />
           <CommandPalette />
           <SharedPlaneHost />
           <SharedPlanePanel />

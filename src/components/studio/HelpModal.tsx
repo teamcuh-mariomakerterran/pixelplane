@@ -40,19 +40,16 @@ export function HelpModal() {
           <Block title="Place in scene">
             Select an animation, switch to Place, click anywhere on the plane to drop a live actor.
           </Block>
-          <Block title="Engine wiring (unique to PixelPlane)">
-            Connect Godot / Unity / Generic from the top bar. That builds an engine-friendly folder
-            tree (characters, animations, environments, items, UI, HUD…). Draw a <b>feed plane</b>{" "}
-            (W tool) around art you want to export, or pick a connector from the wire palette and
-            drag it onto the canvas. A destination picker lets you pick an existing folder or{" "}
-            <b>Add character / entity</b> (auto main · facings · concept · variants · cosmetics)
-            with a pixel size that inherits to siblings. Multiple planes can feed the same folder.
-            Export ZIP packages everything for your engine.
+          <Block title="Plane folders (this is the engine)">
+            Open <b>Play project</b> from the top bar to name the folders this plane already
+            plays — characters, animations, interiors, items. Draw a <b>feed plane</b> (W tool)
+            around art, or drag a connector from the wire palette. Destinations stay on this
+            plane. PixelPlane is the start-to-finish engine; nothing is packaged for Godot or Unity.
           </Block>
           <Block title="Starter pack">
             Open <b>Pack</b> in the top bar for free-use example art (rats, zeRo.exe, portraits,
             neon scenes, sheets). Click any thumbnail to drop it on the plane — edit, animate, wire
-            into engine folders, and export.
+            into folders, and play.
           </Block>
           <Block title="Parallax backgrounds">
             Pack → Environments includes a <b>Rain City Parallax Set</b> (far / mid / near). Dropping
@@ -60,11 +57,9 @@ export function HelpModal() {
             <b>Auto-preview</b> scrolls depth; pan the plane to feel camera motion. Switch{" "}
             <b>Viewport / Sheet-wide</b> in the inspector. Depth 0 = farthest, 1 = nearest.
           </Block>
-          <Block title="Engine parallax export">
-            Connect Godot, Unity, Unreal, or GameMaker. Wire the <b>Parallax</b> connector onto a
-            feed plane (or select a stack + click Parallax). Export writes layer PNGs plus native
-            setup: Godot <code>Parallax2D</code> scenes, Unity LateUpdate script, Unreal
-            ScrollFactor component, GameMaker <code>layer_x/y</code> GML.
+          <Block title="Parallax on the plane">
+            Wire the <b>Parallax</b> connector onto a feed plane (or select a stack + click
+            Parallax). Layers live here and scroll in Play. No export to another engine.
           </Block>
           <Block title="Camera locations (StarCraft-style)">
             <b>Ctrl+F1…F12</b> saves your current view. <b>F1…F12</b> jumps back. Locations show on

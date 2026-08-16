@@ -174,7 +174,7 @@ export function WirePalette() {
           onClick={() => setShowEngine(true)}
           className="rounded border border-dashed border-border px-2 py-1 text-[10px] text-muted hover:border-accent/40 hover:text-fg"
         >
-          Connect engine project to finish wiring…
+          Name a play project to finish wiring…
         </button>
       )}
 

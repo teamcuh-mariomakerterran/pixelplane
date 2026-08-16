@@ -12,6 +12,7 @@ import { TOOL_LABELS } from "@/lib/hotkeys/defaults";
 import type { ToolId } from "@/lib/pixel/types";
 import { summonNightDistrict } from "@/lib/packs/night-district";
 import { summonGoodiesDrop, summonSkylineSet, summonCityKit, summonFxLab } from "@/lib/packs/goodies";
+import { summonNeonPurrVfx } from "@/lib/packs/neonpurr";
 import { useShaderGraph } from "@/store/shader-graph";
 import { stampTimeline } from "@/store/timeline";
 import { useKernels } from "@/store/kernels";
@@ -21,6 +22,9 @@ import { useRuleCards } from "@/store/rule-cards";
 import { useCategoryPlanes } from "@/store/category-planes";
 import { CATALOG } from "@/lib/packs/category-planes";
 import { useCraftLab } from "@/store/craft-lab";
+import { useAssetVault } from "@/store/asset-vault";
+import { useInteriorDistrict } from "@/store/interior-district";
+import { useHauntDistrict } from "@/store/haunt-district";
 import { pickSnapshot, saveSnapshot } from "@/lib/pixel/persist";
 import { Keyboard } from "lucide-react";
 
@@ -183,8 +187,8 @@ export function CommandPalette() {
         id: "craft",
         group: "Craft",
         label: "Open Craft lab",
-        hint: "boil · tiles · QA",
-        keywords: "craft boil tile qa quality",
+        hint: "boil · tiles · QA · proc",
+        keywords: "craft boil tile qa quality proc vfx",
         run: () => useCraftLab.getState().setShowPanel(true),
       },
       {
@@ -211,6 +215,42 @@ export function CommandPalette() {
         label: "Run sprite QA",
         keywords: "qa orphan bleed palette check",
         run: () => useCraftLab.getState().runQa(),
+      },
+      {
+        id: "proc-vfx",
+        group: "Craft",
+        label: "Bake procedural VFX",
+        hint: "explosion · spark · beam · debris · scar · haze",
+        keywords: "proc vfx procedural explosion spark beam debris scar haze generate",
+        run: () => {
+          useCraftLab.getState().setTab("proc");
+          useCraftLab.getState().bakeProc();
+        },
+      },
+      {
+        id: "vault",
+        group: "Craft",
+        label: "Open Asset Vault",
+        hint: "ingest · doors · furnish · built · clipboard",
+        keywords: "vault asset building door indoor furnish clipboard inventory",
+        run: () => useAssetVault.getState().setShowPanel(true),
+      },
+      {
+        id: "vault-ingest",
+        group: "Craft",
+        label: "Ingest active board into vault",
+        keywords: "ingest vault store background remove",
+        run: () => useAssetVault.getState().ingestActive("building"),
+      },
+      {
+        id: "vault-atlus",
+        group: "Craft",
+        label: "Load Atlus pack into vault",
+        hint: "punch · slice · sort by 3/4 · top-down · side",
+        keywords: "atlus vault pack perspective threequarter topdown interior street ui",
+        run: () => {
+          void useAssetVault.getState().ingestPack();
+        },
       },
       {
         id: "fire-zone",
@@ -276,6 +316,14 @@ export function CommandPalette() {
         },
       },
       {
+        id: "neonpurr",
+        group: "Signature",
+        label: "Summon NeonPurr VFX sheets",
+        hint: "85 contact sheets · explosion / debris / spark / beam / energy",
+        keywords: "neonpurr vfx explosion debris spark beam energy gridpaw sheets",
+        run: () => summonNeonPurrVfx(),
+      },
+      {
         id: "shaderseed",
         group: "Signature",
         label: "Seed Shader Lab on plane",
@@ -329,6 +377,18 @@ export function CommandPalette() {
           if (!s.graphs[0]) s.seedLab(true);
           const id = useShaderGraph.getState().graphs[0]?.id;
           if (id) useShaderGraph.getState().applyPreset(id, "night");
+        },
+      },
+      {
+        id: "shaderprism",
+        group: "Signature",
+        label: "Shader look · Prism",
+        keywords: "shader prism disperse spectrum rainbow cauchy diamond",
+        run: () => {
+          const s = useShaderGraph.getState();
+          if (!s.graphs[0]) s.seedLab(true);
+          const id = useShaderGraph.getState().graphs[0]?.id;
+          if (id) useShaderGraph.getState().applyPreset(id, "prism");
         },
       },
       {
@@ -568,6 +628,31 @@ export function CommandPalette() {
         label: "City District",
         keywords: "tiles footing",
         run: () => useCityDistrict.getState().setShowPanel(true),
+      },
+      {
+        id: "intdist",
+        group: "Suite",
+        label: "Interior District",
+        keywords: "interior rooms floor plan doors stairs vault",
+        run: () => {
+          const st = useInteriorDistrict.getState();
+          if (!st.districts.length) st.spawnDistrict();
+          st.setShowPanel(true);
+          const house = useAssetVault.getState().assets.find((a) => a.name === "Shithole House");
+          if (house) st.pullFromVault(house.id);
+        },
+      },
+      {
+        id: "haunt",
+        group: "Suite",
+        label: "Haunt District",
+        keywords: "haunt residue sleep save house memory voicemail",
+        run: () => {
+          const st = useHauntDistrict.getState();
+          if (!st.districts.length) st.spawnDistrict();
+          st.setShowPanel(true);
+          st.hydrateFromMemory();
+        },
       },
       {
         id: "memory",

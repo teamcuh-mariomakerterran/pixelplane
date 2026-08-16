@@ -16,7 +16,7 @@
 | **Human lead / co-designer** | Brian Moore (only human on the project) |
 | **AI lead / co-designer / builder** | Grok Build (primary implementer in this sandbox) |
 | **Ideas advisor (no code)** | Gemini — product/systems “A,B,C → consider D” voice; see **`GEMINI_BRIEFING.md`** |
-| **Future helpers** | Other AIs (e.g. Claude, Copilot) — read COMPENDIUM first; do not invent parallel product stories |
+| **Future helpers** | Other AIs (Claude, extra Grok) — read COMPENDIUM + `src/lib/city-engine/modules.ts`; land as `EngineModule`. Do not invent a second runtime or import stores from `step`. |
 | **End-user guide polish** | Copilot may reformat §12 into a neat reference booklet |
 
 ### After every change (non-negotiable)
@@ -33,6 +33,7 @@
 ### First Calamity (epoch · 2026-08-09)
 Partial writes wiped core plane files with **no version control**. Recovery succeeded; git init followed.
 **Rule forever:** commit after every real ship. Freestyle hard — crash soft.
+**Standing practice (2026-08-16):** after a real pass, run `scripts/safety-snapshot.sh` (typecheck + commit). Do not leave interiors, vault, host, or lab uncommitted overnight. Attachments / debug dumps stay out of git.
 
 ### Sandbox / preview contract (platform)
 - App serves on **`0.0.0.0:8080`** via Vite; platform live preview discovers it.
@@ -62,7 +63,7 @@ Brian’s product is **not** “another Aseprite clone.” It is:
 1. A **vast open plane** (infinite pan/zoom) that holds sprite sheets, concept art, environments, HUD, notes, animations, particles, parallax stacks, mini-games, and feed planes **side by side**.
 2. **Animation squares** drawn on the plane become live frame stacks with inspector tools.
 3. **Drag assets** from production areas into anim regions, then into **scene** regions to playtest in context.
-4. **Engine wiring**: connector icons + feed planes map canvas regions → Godot / Unity / Unreal / GameMaker / generic folder trees with size presets and export ZIP.
+4. **The plane is the engine:** feed planes and folders live here. Play is native City Engine. We do not export to Godot / Unity / Unreal.
 5. **Generator** path (prompt + reference → pixel characters/anims) — currently procedural; deeper AI later.
 6. **Commercial uniqueness:** features no other tool combines (timeline-on-canvas, palette gravity, play kernels, wire heatmaps, in-canvas UI language, etc.). See §6–8.
 
@@ -100,7 +101,7 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 
 ### 1.2 Engine growth doctrine (Brian — 2026-08-04)
 
-**End state (not tomorrow, but always aimed at):** PixelPlane is not only a toolkit *plus* a mini sandbox. It grows into a **full, seamless game-creation package** — art → anim → systems → play → ship — in our style and flow, including tools and ideas the industry hasn’t standardized yet. External engines (Godot/Unity/…) remain first-class **export / wire** targets forever; our own engine is the **native play + eventually full production runtime**.
+**End state:** PixelPlane is the start-to-finish engine — art → anim → systems → play → ship. The plane is the development interface. City Engine is the native runtime. **External engines (Godot / Unity / Unreal / GameMaker) are no longer destinations.** Folder wiring stays on this plane. (Doctrine updated 2026-08-16.)
 
 **Birthplace:** the **City Engine** (GTA-style top-down open-world sandbox) is seed, not toy. Every piece we add there must **feed a growing system** — flow, function, and extension points — so future systems land without catastrophic backtracking.
 
@@ -117,17 +118,18 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 | Mode | Behavior |
 |------|----------|
 | **Guided** | Perspective + pixel size (16/32/64/…) suggests which assets fit, what facings matter, folder defaults |
-| **Free** | User sets perspective/engine intent; engine **wires toward** that (camera, collision assumptions, export layout) with **zero nagging** |
+| **Free** | User sets perspective; engine **wires toward** that (camera, collision) with **zero nagging** |
 
 **Studio org at company scale (background vision):** role canvases (art / anim / systems / env / QA) under one project; **central feed-hub planes** so a character or anim can be wired to a hub and fan out to other teams’ planes. Spatial scope + wire zones are early DNA for that.
 
 **Implementation rules for Grok (always):**
 
-1. Prefer **pluggable modules** (camera, input, physics stub, world realm outdoor/indoor, props, quest hooks) over hard-coded one-game logic.  
+1. Prefer **pluggable modules** (`registerEngineModule` in `src/lib/city-engine/modules.ts`) over dumping into `sim.ts`.  
 2. Name and document **perspective profiles** even if only one is implemented.  
-3. Studio art + City Engine share **contracts** (destructibles registry, quest JSON, spatial scopes, pixel size) — never a one-way demo hack.  
+3. Studio art + City Engine share **contracts**. The play clock talks to **EngineHost** — never Zustand stores.  
 4. Clean-room forever: mechanics free; no stolen expression.  
-5. Small finished living systems > half a mega-engine.
+5. Small finished living systems > half a mega-engine.  
+6. **Intake for other AIs:** drop a file, implement `EngineModule` (`compile` / `step` / `draw`), register it. Do not import stores from `step`. Read `src/lib/city-engine/modules.ts` first.
 
 ---
 
@@ -149,6 +151,19 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 ---
 
 ## 3. Changelog (newest first)
+
+### 2026-08-16 — EngineHost · junk-drawer cut · we are the engine
+- Play clock no longer imports Zustand. `EngineHost` is the only desk/play door (`host.ts` + `host-studio.ts`).
+- Juice and indoor session peeled out of `sim.ts` (`juice.ts`, `indoor-session.ts`).
+- Module intake: `registerEngineModule` — compile / step / draw. Other AIs land here.
+- Godot / Unity / Unreal export retired as a product goal. Play-project folders stay on the plane.
+- Look and play unchanged (silent bones pass).
+
+### 2026-08-14 — Lab walks in engine · interiors thickened
+- Character District idle/walk/run clips play on the City Engine player.
+- Hero · idle / Hero · walk auto-seed from the Night District sheet if the lab is empty.
+- 8-dir facing + leg-step walk when no custom strip is bound.
+- Shithole House gained a Bedroom + kitchen leftover; indoor floors, doorway glows, dark-room cone.
 
 ### 2026-08-13 — City ambient beds
 - Continuous rumble, neon hum, wind, indoor room tone (own bus — smash duck doesn't kill the street).
@@ -488,7 +503,7 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 | Style | Tailwind v4, dark charcoal + amber accent |
 | Pixels | `Uint8ClampedArray` buffers, canvas 2D, pixel-perfect |
 | Persist | IndexedDB (`pixelplane_v1`), localStorage for hotkeys/bookmarks/tips |
-| Engines | Godot, Unity, Unreal, GameMaker, Generic export |
+| Runtime | **City Engine** (TypeScript + canvas 2D) — this is the engine |
 | Port | `0.0.0.0:8080` |
 
 ### 4.2 Key source map
@@ -545,7 +560,7 @@ Those tools gave creative minds real power. We respect that. Our posture is: *th
 | Place actors | **Solid** | Live frame playback on plane |
 | Particles | **OK** | Procedural kinds; not a full particle lab |
 | Parallax preview | **Solid** | Depth scroll on pan; multi-layer |
-| Engine connect + wire zones | **Solid** | Godot default demo; destination picker |
+| Engine connect + wire zones | **Solid** | Play-project folders on the plane (no external-engine export) |
 | Export ZIP | **Solid** | Folders + engine-specific stubs/configs |
 | Starter pack | **Solid** | Manifest-driven; auto seed on empty |
 | Solitaire | **Solid** | Full Klondike; skin rebinding from artboards |
@@ -766,7 +781,7 @@ node scripts/browser-smoke.mjs http://127.0.0.1:8080/ /workspace/screenshots/smo
 > Copilot may reformat this section into a polished PDF/page; **keep behavior accurate**.
 
 ### 12.1 What is PixelPlane?
-A giant digital **work table** for 2D games. Draw sprites, cut animations, build backgrounds, test a little solitaire skin, and mark areas that export into Godot/Unity/etc. — all without switching apps.
+A giant digital **work table** for 2D games. Draw sprites, cut animations, build rooms, play them in City Engine — all without switching apps. This plane **is** the engine.
 
 ### 12.2 Moving around
 | Action | How |
@@ -832,9 +847,9 @@ Draw / Pack / Generate  →  artboards on the plane
          ↓
    Place actors + parallax + particles  →  living scene collage
          ↓
-   Feed planes + Connect  →  engine folders
+   Feed planes + Play project  →  folders on this plane
          ↓
-   Export ZIP  →  drop into Godot / Unity / etc.
+   City Engine Play  →  the game, here
 ```
 Camera F-keys + plane map let you treat the canvas like a **whole studio floor**: F1 characters, F2 anims, F3 world, F4 HUD…
 
@@ -1043,9 +1058,9 @@ You are not starting a new app. You are **continuing PixelPlane**.
 
 | Suite | Role |
 |-------|------|
-| **Studio** | Infinite plane — make / slice / wire / guides / shared collab assets |
-| **City Engine** | **Birthplace of PixelPlane Engine** — play sandbox that grows module-by-module into a real engine |
-| **Export wires** | Forever optional path out to Godot / Unity / Unreal / GameMaker / generic |
+| **Studio** | Infinite plane — make / slice / wire / the development interface |
+| **City Engine** | **The runtime** — play sandbox that grows module-by-module into the full engine |
+| **Modules** | Outside systems land via `registerEngineModule` (compile / step / draw). No second runtime. |
 
 - Mechanics of open-world crime sandboxes are **not copyrighted** (ideas); expression is. We never ship Rockstar art or decompiled code.
 - Study open reimpls (Carnage3D MIT, FreeCrime) for *architecture patterns only* → write fresh TypeScript. Same rule later for FPS (e.g. open raycast/Doom-style refs).

@@ -10,12 +10,16 @@ import { useWaveA } from "@/store/wave-a";
 import { usePlaneSystems } from "@/store/plane-systems";
 import { useSpatialNav } from "@/store/spatial-nav";
 import { useCharacterDistrict } from "@/store/character-district";
+import { useInteriorDistrict } from "@/store/interior-district";
+import { useHauntDistrict } from "@/store/haunt-district";
 import { useCollab } from "@/store/collab";
 import { useMemoryWeb } from "@/store/memory-web";
 import { useSignature } from "@/store/signature";
 import { useCraftLab } from "@/store/craft-lab";
-import { applyBoil, boilFrame } from "@/lib/pixel/boil";
+import { applyBoil, boilDrawMotion, boilFrame, type BoilSpark } from "@/lib/pixel/boil";
 import { QA_COLORS } from "@/lib/pixel/sprite-qa";
+import { blitSpriteCA } from "@/lib/pixel/chroma";
+import { tickBoilSizzle } from "@/lib/audio/juice";
 import {
   TRIGGER_META,
   triggerBadgeBox,
@@ -45,6 +49,10 @@ import {
 } from "@/lib/shaders/graph";
 import { wireZoneHeat, worldCenterFromCamera } from "@/lib/spatial/wave-a";
 import { zoneWorld, padWorld } from "@/lib/character-district/layout";
+import {
+  zoneWorld as interiorZoneWorld,
+  padWorld as interiorPadWorld,
+} from "@/lib/interior-district/layout";
 import { CHUNK } from "@/lib/spatial/interest";
 import { currentStage } from "@/lib/destructibles/presets";
 
@@ -114,11 +122,82 @@ function prefersReducedMotion() {
 }
 
 const boilScratch: { c: HTMLCanvasElement | null } = { c: null };
+const boilGhosts = new Map<string, HTMLCanvasElement>();
+type BoilMote = {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  r: number;
+  g: number;
+  b: number;
+};
+const boilMotes: BoilMote[] = [];
+const boilSrcCache = new Map<string, Uint8ClampedArray>();
+const boilReadCanvas: { c: HTMLCanvasElement | null } = { c: null };
+
+function pixelsFromArtboard(b: {
+  id: string;
+  width: number;
+  height: number;
+  sourceUrl?: string;
+  layers?: { data: unknown; visible?: boolean; opacity?: number }[];
+}): Uint8ClampedArray | null {
+  const w = b.width | 0;
+  const h = b.height | 0;
+  if (w < 2 || h < 2) return null;
+  if (b.sourceUrl) {
+    const key = `u:${b.sourceUrl}:${w}x${h}`;
+    const hit = boilSrcCache.get(key);
+    if (hit) return hit;
+    const img = getStarterHtmlImage(b.sourceUrl);
+    if (img && img.complete && img.naturalWidth > 0) {
+      if (!boilReadCanvas.c) boilReadCanvas.c = document.createElement("canvas");
+      const c = boilReadCanvas.c;
+      if (c.width !== w) c.width = w;
+      if (c.height !== h) c.height = h;
+      const x = c.getContext("2d", { willReadFrequently: true });
+      if (!x) return null;
+      x.imageSmoothingEnabled = false;
+      x.clearRect(0, 0, w, h);
+      x.drawImage(img, 0, 0, w, h);
+      const data = new Uint8ClampedArray(x.getImageData(0, 0, w, h).data);
+      boilSrcCache.set(key, data);
+      return data;
+    }
+  }
+  try {
+    const c = getBoardCanvas(b as never);
+    if (c && c.width > 0 && c.height > 0) {
+      const x = c.getContext("2d", { willReadFrequently: true });
+      if (x) return new Uint8ClampedArray(x.getImageData(0, 0, c.width, c.height).data);
+    }
+  } catch {
+    /* */
+  }
+  const layer = b.layers?.[0];
+  if (layer && !isBufferHollow(layer.data, w, h)) {
+    return compositeLayers(
+      (b.layers || []).map((L) => ({
+        data: L.data as Uint8ClampedArray,
+        visible: L.visible !== false,
+        opacity: L.opacity ?? 1,
+      })),
+      w,
+      h,
+    );
+  }
+  return null;
+}
+
 function drawBoil(
   ctx: CanvasRenderingContext2D,
   img: ImageData,
   x: number,
   y: number,
+  boardId: string,
+  chroma: number,
 ) {
   if (!boilScratch.c) boilScratch.c = document.createElement("canvas");
   const c = boilScratch.c;
@@ -128,7 +207,22 @@ function drawBoil(
   if (!tctx) return;
   tctx.putImageData(img, 0, 0);
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(c, x, y);
+  const ghost = boilGhosts.get(boardId);
+  if (ghost && ghost.width === img.width) {
+    ctx.save();
+    ctx.globalAlpha = 0.28;
+    ctx.drawImage(ghost, x + 1, y);
+    ctx.restore();
+  }
+  blitSpriteCA(ctx, c, x, y, chroma);
+  let slot = boilGhosts.get(boardId);
+  if (!slot || slot.width !== img.width || slot.height !== img.height) {
+    slot = document.createElement("canvas");
+    slot.width = img.width;
+    slot.height = img.height;
+    boilGhosts.set(boardId, slot);
+  }
+  slot.getContext("2d")?.drawImage(c, 0, 0);
 }
 
 const boardCache = new Map<string, { rev: string; canvas: HTMLCanvasElement }>();
@@ -150,6 +244,9 @@ export function clearPlaneBlitCaches() {
   boardCache.clear();
   animCache.clear();
   layerDataCache.clear();
+  boilGhosts.clear();
+  boilMotes.length = 0;
+  boilSrcCache.clear();
   for (const s of shaderPreviewCache.values()) {
     try {
       s.handle.dispose();
@@ -242,7 +339,11 @@ function getAnimCanvas(anim: {
   c.height = anim.frameH;
   const ctx = c.getContext("2d")!;
   ctx.imageSmoothingEnabled = false;
-  ctx.putImageData(bufferToImageData(frame.data, anim.frameW, anim.frameH), 0, 0);
+  try {
+    ctx.putImageData(bufferToImageData(frame.data, anim.frameW, anim.frameH), 0, 0);
+  } catch {
+    return null;
+  }
   animCache.set(anim.id, { key, canvas: c });
   return c;
 }
@@ -641,6 +742,118 @@ export function CanvasWorkspace() {
         }
       }
 
+      // Interior districts — floor plan pads
+      const interiors = useInteriorDistrict.getState();
+      for (const d of interiors.districts) {
+        ctx.fillStyle = hexAlpha(d.color, 0.04);
+        ctx.strokeStyle = hexAlpha(d.color, d.id === interiors.activeId ? 0.9 : 0.4);
+        ctx.lineWidth = 2 / cam.zoom;
+        ctx.fillRect(d.x, d.y, d.w, d.h);
+        ctx.strokeRect(d.x, d.y, d.w, d.h);
+        for (const key of Object.keys(d.zones)) {
+          const zw = interiorZoneWorld(d, key);
+          ctx.strokeStyle = hexAlpha(d.color, 0.3);
+          ctx.lineWidth = 1 / cam.zoom;
+          ctx.strokeRect(zw.x, zw.y, zw.w, zw.h);
+          if (cam.zoom > 0.25) {
+            labels.push({
+              text: d.zones[key].label,
+              x: cam.x + zw.x * cam.zoom + 4,
+              y: cam.y + zw.y * cam.zoom + 12,
+              color: "rgba(62,207,207,0.75)",
+            });
+          }
+        }
+        for (const link of d.links) {
+          const a = d.roomPads.find((p) => p.id === link.fromPadId);
+          const b = d.roomPads.find((p) => p.id === link.toPadId);
+          if (!a || !b) continue;
+          ctx.strokeStyle = link.kind === "stair" ? "rgba(232,168,56,0.7)" : "rgba(62,207,207,0.45)";
+          ctx.lineWidth = (link.kind === "stair" ? 2 : 1.2) / cam.zoom;
+          ctx.beginPath();
+          ctx.moveTo(d.x + a.x + a.w / 2, d.y + a.y + a.h / 2);
+          ctx.lineTo(d.x + b.x + b.w / 2, d.y + b.y + b.h / 2);
+          ctx.stroke();
+        }
+        for (const pad of d.roomPads) {
+          const pw = interiorPadWorld(d, pad);
+          ctx.fillStyle = hexAlpha(pad.color, pad.dark ? 0.08 : 0.16);
+          ctx.strokeStyle = hexAlpha(pad.color, pad.locked ? 0.95 : 0.7);
+          ctx.lineWidth = 1.25 / cam.zoom;
+          ctx.fillRect(pw.x, pw.y, pw.w, pw.h);
+          ctx.strokeRect(pw.x, pw.y, pw.w, pw.h);
+          if (cam.zoom > 0.3) {
+            labels.push({
+              text: `${pad.name}${pad.window ? " win" : ""}${pad.locked ? " lock" : ""}`,
+              x: cam.x + pw.x * cam.zoom + 4,
+              y: cam.y + pw.y * cam.zoom + 12,
+              color: hexAlpha(pad.color, 0.95),
+            });
+          }
+        }
+        for (const lp of d.lightPads) {
+          ctx.fillStyle = lp.color;
+          ctx.globalAlpha = 0.7;
+          ctx.beginPath();
+          ctx.arc(d.x + lp.x, d.y + lp.y, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.globalAlpha = 1;
+        }
+        if (cam.zoom > 0.15) {
+          labels.push({
+            text: d.name,
+            x: cam.x + d.x * cam.zoom,
+            y: cam.y + d.y * cam.zoom - 6,
+            color: hexAlpha(d.color, 0.95),
+          });
+        }
+      }
+
+      // Haunt districts — residue pads
+      const haunts = useHauntDistrict.getState();
+      for (const d of haunts.districts) {
+        ctx.fillStyle = hexAlpha(d.color, 0.05);
+        ctx.strokeStyle = hexAlpha(d.color, d.id === haunts.activeId ? 0.9 : 0.4);
+        ctx.lineWidth = 2 / cam.zoom;
+        ctx.fillRect(d.x, d.y, d.w, d.h);
+        ctx.strokeRect(d.x, d.y, d.w, d.h);
+        if (d.sleepNode) {
+          ctx.fillStyle = "rgba(192,132,252,0.35)";
+          ctx.fillRect(d.x + d.sleepNode.x, d.y + d.sleepNode.y, 72, 28);
+          if (cam.zoom > 0.3) {
+            labels.push({
+              text: d.lastSave ? "SLEPT" : "SLEEP",
+              x: cam.x + (d.x + d.sleepNode.x) * cam.zoom + 4,
+              y: cam.y + (d.y + d.sleepNode.y) * cam.zoom + 14,
+              color: "rgba(232,200,255,0.95)",
+            });
+          }
+        }
+        for (const r of d.residues) {
+          ctx.fillStyle = "rgba(192,132,252,0.14)";
+          ctx.strokeStyle = "rgba(192,132,252,0.55)";
+          ctx.lineWidth = 1 / cam.zoom;
+          ctx.fillRect(d.x + r.x, d.y + r.y, 80, 40);
+          ctx.strokeRect(d.x + r.x, d.y + r.y, 80, 40);
+          if (cam.zoom > 0.35) {
+            labels.push({
+              text: r.label.slice(0, 22),
+              x: cam.x + (d.x + r.x) * cam.zoom + 3,
+              y: cam.y + (d.y + r.y) * cam.zoom + 12,
+              color: "rgba(232,210,255,0.9)",
+            });
+          }
+        }
+        if (cam.zoom > 0.15) {
+          labels.push({
+            text: d.name,
+            x: cam.x + d.x * cam.zoom,
+            y: cam.y + d.y * cam.zoom - 6,
+            color: hexAlpha(d.color, 0.95),
+          });
+        }
+      }
+
       // Parallax stacks — draw real layer pixels (artboard link OR embedded buffer)
       for (const px of state.parallaxStacks) {
         ctx.save();
@@ -789,56 +1002,105 @@ export function CanvasWorkspace() {
             const hollow =
               !layer || isBufferHollow(layer.data, b.width, b.height);
             let painted = false;
-            // PRIMARY for starter art: draw the actual image file. Pixel buffers
-            // are used for editing; they can be hollow after IDB round-trips.
-            // Prefer the live bitmap whenever sourceUrl is set and loaded.
-            if (b.sourceUrl) {
-              const img = getStarterHtmlImage(b.sourceUrl);
-              if (img && img.complete && img.naturalWidth > 0) {
-                ctx.imageSmoothingEnabled = false;
-                ctx.drawImage(
-                  img,
-                  b.x,
-                  b.y,
-                  b.width || img.naturalWidth,
-                  b.height || img.naturalHeight,
-                );
-                painted = true;
-              } else {
-                prefetchStarterImages([b.sourceUrl]);
-              }
-            }
-            // Buffer path: user art / edited boards / sourceUrl not ready yet
-            if (!painted && !hollow) {
+            const craft = useCraftLab.getState();
+            const wantBoil =
+              craft.boilOn &&
+              (craft.boilAll ||
+                b.id === state.activeArtboardId ||
+                (craft.boilBoardIds?.includes(b.id) ?? false)) &&
+              b.width * b.height <= 360000;
+            let boiledOk = false;
+            if (wantBoil) {
               try {
-                const c = getBoardCanvas(b);
-                if (c && c.width > 0 && c.height > 0) {
-                  ctx.drawImage(c, b.x, b.y);
+                const src = pixelsFromArtboard(b);
+                if (src && src.length >= b.width * b.height * 4) {
+                  const frame = boilFrame(tNow, craft.boil.intensity);
+                  const sparks: BoilSpark[] = [];
+                  const boiled = applyBoil(
+                    src,
+                    b.width,
+                    b.height,
+                    craft.boil,
+                    frame,
+                    sparks,
+                  );
+                  const img = bufferToImageData(boiled, b.width, b.height);
+                  const mot = boilDrawMotion(
+                    craft.boil.pattern,
+                    tNow,
+                    craft.boil.intensity,
+                  );
+                  ctx.save();
+                  ctx.translate(b.x + b.width / 2 + mot.ox, b.y + b.height / 2 + mot.oy);
+                  if (mot.rot) ctx.rotate(mot.rot);
+                  ctx.transform(mot.scaleX, 0, mot.shearX, mot.scaleY, 0, 0);
+                  ctx.translate(-(b.x + b.width / 2), -(b.y + b.height / 2));
+                  drawBoil(ctx, img, b.x, b.y, b.id, mot.chroma);
+                  ctx.restore();
+                  boiledOk = true;
                   painted = true;
+                  if (!prefersReducedMotion()) {
+                    for (const sp of sparks) {
+                      boilMotes.push({
+                        x: b.x + sp.x,
+                        y: b.y + sp.y,
+                        vx: (Math.random() - 0.5) * 22,
+                        vy: -10 - Math.random() * 18,
+                        life: 0.4 + Math.random() * 0.4,
+                        r: sp.c[0],
+                        g: sp.c[1],
+                        b: sp.c[2],
+                      });
+                    }
+                    if (boilMotes.length > 80) {
+                      boilMotes.splice(0, boilMotes.length - 80);
+                    }
+                  }
+                  const pulse = 0.5 + 0.5 * Math.sin(tNow / 220);
+                  ctx.save();
+                  ctx.strokeStyle = `rgba(62,207,207,${0.35 + pulse * 0.5})`;
+                  ctx.lineWidth = (1.6 + pulse) / cam.zoom;
+                  ctx.strokeRect(
+                    b.x - 3 / cam.zoom,
+                    b.y - 3 / cam.zoom,
+                    b.width + 6 / cam.zoom,
+                    b.height + 6 / cam.zoom,
+                  );
+                  ctx.restore();
                 }
               } catch {
-                painted = false;
+                boiledOk = false;
               }
             }
-            // Live boil — overlay only, never writes the board
-            try {
-              const craft = useCraftLab.getState();
-              const wantBoil =
-                craft.boilOn &&
-                (craft.boilAll ||
-                  b.id === state.activeArtboardId ||
-                  (craft.boilBoardIds?.includes(b.id) ?? false)) &&
-                !prefersReducedMotion() &&
-                b.width * b.height <= 180000;
-              if (wantBoil && !hollow) {
-                const src = compositeLayers(b.layers, b.width, b.height);
-                const frame = boilFrame(tNow, craft.boil.intensity);
-                const boiled = applyBoil(src, b.width, b.height, craft.boil, frame);
-                const img = bufferToImageData(boiled, b.width, b.height);
-                drawBoil(ctx, img, b.x, b.y);
+            // Static blit only when boil didn't paint the live sprite
+            if (!boiledOk) {
+              if (b.sourceUrl) {
+                const img = getStarterHtmlImage(b.sourceUrl);
+                if (img && img.complete && img.naturalWidth > 0) {
+                  ctx.imageSmoothingEnabled = false;
+                  ctx.drawImage(
+                    img,
+                    b.x,
+                    b.y,
+                    b.width || img.naturalWidth,
+                    b.height || img.naturalHeight,
+                  );
+                  painted = true;
+                } else {
+                  prefetchStarterImages([b.sourceUrl]);
+                }
               }
-            } catch {
-              /* */
+              if (!painted && !hollow) {
+                try {
+                  const c = getBoardCanvas(b);
+                  if (c && c.width > 0 && c.height > 0) {
+                    ctx.drawImage(c, b.x, b.y);
+                    painted = true;
+                  }
+                } catch {
+                  painted = false;
+                }
+              }
             }
             // QA overlay
             try {
@@ -912,6 +1174,28 @@ export function CanvasWorkspace() {
           ctx.strokeRect(board.x + s.x, board.y + s.y, s.w, s.h);
           ctx.setLineDash([]);
         }
+      }
+
+      // boil motes + sizzle
+      {
+        const craft = useCraftLab.getState();
+        const dt = 1 / 60;
+        for (let i = boilMotes.length - 1; i >= 0; i--) {
+          const m = boilMotes[i]!;
+          m.life -= dt;
+          m.x += m.vx * dt;
+          m.y += m.vy * dt;
+          m.vy -= 22 * dt;
+          if (m.life <= 0) {
+            boilMotes.splice(i, 1);
+            continue;
+          }
+          ctx.globalAlpha = Math.max(0, m.life * 1.8);
+          ctx.fillStyle = `rgb(${m.r},${m.g},${m.b})`;
+          ctx.fillRect(m.x, m.y, 1, 1);
+        }
+        ctx.globalAlpha = 1;
+        tickBoilSizzle(craft.boilOn, craft.boil.intensity);
       }
 
       // Anim regions

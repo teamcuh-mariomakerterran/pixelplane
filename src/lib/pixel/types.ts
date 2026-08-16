@@ -41,6 +41,8 @@ export type Artboard = {
   layers: Layer[];
   activeLayerId: string;
   kind: "sheet" | "scene" | "hud" | "note" | "indoor" | "variant";
+  /** External bitmap (starter / VFX pack). Hollow layers; canvas blits this. */
+  sourceUrl?: string | null;
 };
 
 export type AnimFrame = {

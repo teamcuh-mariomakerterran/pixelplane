@@ -63,3 +63,10 @@ screenshots/
 *.sqlite3
 data/
 .pglite/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Debug dumps / pasted screenshots (not product)
+attachments/

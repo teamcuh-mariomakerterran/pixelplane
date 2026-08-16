@@ -284,7 +284,8 @@ function emptyArtboard(w = 128, h = 128, x = 0, y = 0, name = "Artboard", kind: 
     height: h,
     layers: [layer],
     activeLayerId: layer.id,
-    kind
+    kind,
+    sourceUrl: undefined,
   };
 }
 function snapOf(s: any) {
@@ -578,6 +579,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     get().pushHistory();
     const board = emptyArtboard(partial?.width ?? 128, partial?.height ?? 128, partial?.x ?? 40 + get().artboards.length * 20, partial?.y ?? 40 + get().artboards.length * 20, partial?.name ?? `Sheet ${get().artboards.length + 1}`, partial?.kind ?? "sheet");
     if (partial?.layers) board.layers = partial.layers;
+    if (partial?.sourceUrl) board.sourceUrl = partial.sourceUrl;
     set((s) => ({
       artboards: [...s.artboards, board],
       activeArtboardId: board.id,

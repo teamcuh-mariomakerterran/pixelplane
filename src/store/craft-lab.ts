@@ -9,10 +9,12 @@ import { DEFAULT_BOIL, type BoilPattern, type BoilProfile } from "@/lib/pixel/bo
 import { generateTileKit, TILE_VARIANT_META } from "@/lib/pixel/tile-kit";
 import { analyzeSprite, type QaReport } from "@/lib/pixel/sprite-qa";
 import { stampTimeline } from "@/store/timeline";
+import { playJuiceSfx, unlockAudio } from "@/lib/audio/juice";
+import { generateProcVfx, defaultProcSpec, defaultLayers, type ProcKind, type ProcVfxSpec, type ProcLayerId, type ProcLayer } from "@/lib/pixel/proc-vfx";
 
 type CraftState = {
   showPanel: boolean;
-  tab: "boil" | "tiles" | "qa";
+  tab: "boil" | "tiles" | "qa" | "proc";
 
   boilOn: boolean;
   boil: BoilProfile;
@@ -21,6 +23,9 @@ type CraftState = {
 
   qaOn: boolean;
   qaReport: QaReport | null;
+
+  proc: ProcVfxSpec;
+  procSmash: boolean;
 
   setShowPanel: (v: boolean) => void;
   setTab: (t: CraftState["tab"]) => void;
@@ -35,6 +40,13 @@ type CraftState = {
   runQaOn: (boardId: string) => void;
   setQaOn: (v: boolean) => void;
   clearQa: () => void;
+
+  patchProc: (p: Partial<ProcVfxSpec>) => void;
+  patchProcLayer: (id: ProcLayerId, p: Partial<ProcLayer>) => void;
+  setProcKind: (k: ProcKind) => void;
+  rerollProc: () => void;
+  bakeProc: () => void;
+  setProcSmash: (v: boolean) => void;
 };
 
 export const useCraftLab = create<CraftState>((set, get) => ({
@@ -42,24 +54,44 @@ export const useCraftLab = create<CraftState>((set, get) => ({
   tab: "boil",
 
   boilOn: false,
-  boil: { ...DEFAULT_BOIL },
-  boilAll: false,
+  boil: { ...DEFAULT_BOIL, intensity: 6 },
+  boilAll: true,
   boilBoardIds: null,
 
   qaOn: false,
   qaReport: null,
 
+  proc: defaultProcSpec(),
+  procSmash: true,
+
   setShowPanel: (showPanel) => set({ showPanel }),
   setTab: (tab) => set({ tab, showPanel: true }),
   setBoilOn: (boilOn) => {
     set({ boilOn, showPanel: true, tab: "boil" });
+    try {
+      unlockAudio();
+      if (boilOn) playJuiceSfx("sizzle", 1.05);
+    } catch {
+      /* */
+    }
     useStudio
       .getState()
-      .setStatus(boilOn ? "Boil live · edges jitter, highlights locked" : "Boil off");
+      .setStatus(
+        boilOn
+          ? "Boil live · the sprite itself is moving (overlay, not baked)"
+          : "Boil off",
+      );
   },
   setBoilAll: (boilAll) => set({ boilAll }),
   patchBoil: (p) => set((s) => ({ boil: { ...s.boil, ...p } })),
-  setPattern: (pattern) => set((s) => ({ boil: { ...s.boil, pattern } })),
+  setPattern: (pattern) => {
+    set((s) => ({ boil: { ...s.boil, pattern } }));
+    try {
+      playJuiceSfx("blip", 1.1);
+    } catch {
+      /* */
+    }
+  },
 
   spawnTileKit: () => {
     const id = useStudio.getState().activeArtboardId;
@@ -132,4 +164,61 @@ export const useCraftLab = create<CraftState>((set, get) => ({
 
   setQaOn: (qaOn) => set({ qaOn }),
   clearQa: () => set({ qaOn: false, qaReport: null }),
+
+  patchProc: (p) => set((s) => ({ proc: { ...s.proc, ...p, layers: p.layers ?? s.proc.layers } })),
+  patchProcLayer: (id, p) =>
+    set((s) => {
+      const base = defaultLayers();
+      const cur = s.proc.layers ?? base;
+      return {
+        proc: {
+          ...s.proc,
+          direction: s.proc.direction ?? 0,
+          spread: s.proc.spread ?? 70,
+          layers: { ...base, ...cur, [id]: { ...base[id], ...cur[id], ...p } },
+        },
+      };
+    }),
+  setProcKind: (kind) => {
+    set((s) => ({ proc: { ...s.proc, kind }, showPanel: true, tab: "proc" }));
+    try {
+      playJuiceSfx("blip", 1.05);
+    } catch {
+      /* */
+    }
+  },
+  rerollProc: () => {
+    set((s) => ({
+      proc: { ...s.proc, seed: (Math.random() * 1e9) | 0 },
+      showPanel: true,
+      tab: "proc",
+    }));
+  },
+  bakeProc: () => {
+    const spec = get().proc;
+    const out = generateProcVfx(spec);
+    const studio = useStudio.getState();
+    const cam = studio.camera;
+    const z = cam.zoom || 1;
+    const x = (-cam.x + 120) / z;
+    const y = (-cam.y + 80) / z;
+    const id = studio.importImageToArtboard(
+      out.sheet,
+      out.sheetW,
+      out.sheetH,
+      `Proc · ${spec.kind} · ${spec.seed.toString(36)}`,
+      Math.round(x),
+      Math.round(y),
+    );
+    studio.selectArtboard(id);
+    studio.setStatus(`Proc VFX · ${spec.kind} · ${spec.frames} frames baked`);
+    stampTimeline("Proc VFX", spec.kind);
+    try {
+      playJuiceSfx("chord", 1.1);
+    } catch {
+      /* */
+    }
+    set({ showPanel: true, tab: "proc" });
+  },
+  setProcSmash: (procSmash) => set({ procSmash }),
 }));

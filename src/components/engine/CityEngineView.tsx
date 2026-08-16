@@ -37,9 +37,23 @@ import { useCharacterDistrict } from "@/store/character-district";
 import { useStudio } from "@/store/studio";
 import { useSignature } from "@/store/signature";
 import { useRuleCards } from "@/store/rule-cards";
-import { compositeLayers } from "@/lib/pixel/buffer";
+import { compositeLayers, bufferToImageData } from "@/lib/pixel/buffer";
 import { FX_EXPLOSIONS } from "@/lib/icon-library/pixel-packs";
 import { getDecorCellCanvases, clearDecorCellCache } from "@/lib/city-engine/sheet-cells";
+import { sliceHeroFacings, drawHeroFacing } from "@/lib/city-engine/hero-sheet";
+import {
+  seedHeroLabFromImage,
+  resolveLocoClip,
+  drawLocoClip,
+  drawHeroStep,
+} from "@/lib/city-engine/lab-locomotion";
+import { createStudioHost } from "@/lib/city-engine/host-studio";
+import {
+  compileEngineModules,
+  drawEngineModules,
+} from "@/lib/city-engine/modules";
+import { drawIndoorRoom, drawDarkCone } from "@/lib/city-engine/indoor-draw";
+import { roomIsLit } from "@/lib/city-engine/house-memory";
 import { useShaderGraph } from "@/store/shader-graph";
 import {
   compileGraph,
@@ -49,10 +63,48 @@ import {
   type ShaderGraph,
   type ShaderPreviewHandle,
 } from "@/lib/shaders/graph";
+import { applyCanvasCA } from "@/lib/pixel/chroma";
+import { generateProcVfx } from "@/lib/pixel/proc-vfx";
 import { ArrowLeft, Crosshair, Car, Building2, ScrollText, Ghost, Star, Aperture } from "lucide-react";
 
 let engineGradeScratch: HTMLCanvasElement | null = null;
 let engineGradeSlot: { key: string; handle: ShaderPreviewHandle } | null = null;
+const procBurstCache = new Map<string, HTMLCanvasElement[]>();
+
+function hash01(n: number) {
+  let x = (n * 374761393) | 0;
+  x = (x ^ (x >>> 13)) * 1274126177;
+  return ((x ^ (x >>> 16)) >>> 0) / 4294967296;
+}
+
+function framesForBurst(kind: string, seed: number, hue: number, intensity: number) {
+  const key = `${kind}|${seed}|${hue.toFixed(2)}|${intensity}`;
+  const hit = procBurstCache.get(key);
+  if (hit) return hit;
+  const out = generateProcVfx({
+    kind: kind === "spark" ? "spark" : kind === "debris" ? "debris" : "explosion",
+    seed,
+    hue,
+    intensity,
+    frames: 6,
+    size: 48,
+    direction: 0,
+    spread: 180,
+  });
+  const canvases = out.frames.map((f) => {
+    const c = document.createElement("canvas");
+    c.width = f.w;
+    c.height = f.h;
+    c.getContext("2d")?.putImageData(bufferToImageData(f.data, f.w, f.h), 0, 0);
+    return c;
+  });
+  if (procBurstCache.size > 24) {
+    const first = procBurstCache.keys().next().value;
+    if (first) procBurstCache.delete(first);
+  }
+  procBurstCache.set(key, canvases);
+  return canvases;
+}
 
 function applyEngineGrade(
   canvas: HTMLCanvasElement,
@@ -114,7 +166,9 @@ export function CityEngineView() {
     stopCityAmbience();
   };
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stateRef = useRef<EngineState>(createEngineState("topdown_openworld"));
+  const stateRef = useRef<EngineState>(
+    createEngineState("topdown_openworld", createStudioHost()),
+  );
   const traceRef = useRef<PlayTrace>(createTrace());
   const mapImg = useRef<HTMLImageElement | null>(null);
   const vehImg = useRef<HTMLImageElement | null>(null);
@@ -139,6 +193,13 @@ export function CityEngineView() {
     combo: 0,
     boosting: false,
     amb: "street",
+    dialog: "" as string,
+    room: "",
+    keys: 0,
+    saved: false,
+    ringing: false,
+    clip: "",
+    ambient: "",
   });
   const [ready, setReady] = useState(false);
   const enginePost = useShaderGraph((s) => s.enginePost);
@@ -154,6 +215,11 @@ export function CityEngineView() {
     hero.src = "/packs/night-district/cyberpunk_male_main_character.png";
     hero.onload = () => {
       heroImg.current = hero;
+      try {
+        seedHeroLabFromImage(hero);
+      } catch {
+        /* */
+      }
     };
   }, []);
 
@@ -220,7 +286,11 @@ export function CityEngineView() {
           });
         });
       initIndoors(s, extras);
-      if (s.indoorScenes[0]?.exteriorDoors[0]) {
+      if (s.vaultLots[0]) {
+        const lot = s.vaultLots[0]!;
+        s.player.x = lot.x + lot.w / 2;
+        s.player.y = lot.y + lot.h + 18;
+      } else if (s.indoorScenes[0]?.exteriorDoors[0]) {
         const d = s.indoorScenes[0].exteriorDoors[0]!;
         s.player.x = d.x + 30;
         s.player.y = d.y + 40;
@@ -238,6 +308,7 @@ export function CityEngineView() {
         }
       }
       syncNpcsFromMemory(s);
+      compileEngineModules({ host: s.host, state: s });
       try {
         const { useCityDistrict } = await import("@/store/city-district");
         const ft = useCityDistrict.getState().footings;
@@ -363,10 +434,10 @@ export function CityEngineView() {
             ? Math.abs(
                 s.vehicles.find((v) => v.id === s.player.vehicleId)?.speed ?? 0,
               )
-            : s.keys["KeyW"] || s.keys["ArrowUp"]
-              ? 30
-              : s.keys["KeyS"] || s.keys["ArrowDown"] || s.keys["KeyA"] || s.keys["KeyD"]
-                ? 18
+            : s.loco.state === "run"
+              ? 50
+              : s.loco.state === "walk"
+                ? 22
                 : 0;
         useCharacterDistrict.getState().reportEngineState({
           mode: s.player.mode,
@@ -414,7 +485,7 @@ export function CityEngineView() {
       const tn = s.t * 31;
       const shakeX = shakeAmt * 16 * (Math.sin(tn * 1.7) * 0.62 + Math.sin(tn * 4.1) * 0.38) + (s.kickX || 0);
       const shakeY = shakeAmt * 16 * (Math.cos(tn * 1.9) * 0.62 + Math.sin(tn * 5.2) * 0.38) + (s.kickY || 0);
-      const shakeRot = shakeAmt * 0.028 * Math.sin(tn * 3.3);
+      const shakeRot = shakeAmt * 0.028 * Math.sin(tn * 3.3) + (s.bank || 0) * 0.045;
 
       const punchZ = 1 + (s.punch || 0) * 0.09;
       const z = s.camZoom * punchZ;
@@ -454,21 +525,41 @@ export function CityEngineView() {
         }
         ctx.restore();
       } else if (s.realm === "indoor" && s.indoorBake) {
-        const img = new ImageData(
-          new Uint8ClampedArray(s.indoorBake.data),
-          s.indoorBake.w,
-          s.indoorBake.h,
-        );
-        const tmp = document.createElement("canvas");
-        tmp.width = s.indoorBake.w;
-        tmp.height = s.indoorBake.h;
-        tmp.getContext("2d")!.putImageData(img, 0, 0);
-        ctx.save();
-        ctx.translate(ox, oy);
-        ctx.scale(z, z);
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(tmp, 0, 0, s.worldW, s.worldH);
-        ctx.restore();
+        try {
+          const src = s.indoorBake.data;
+          const need = s.indoorBake.w * s.indoorBake.h * 4;
+          const buf = src.length === need ? src : (() => {
+            const p = new Uint8ClampedArray(need);
+            p.set(src.subarray(0, Math.min(src.length, need)));
+            return p;
+          })();
+          const img = new ImageData(new Uint8ClampedArray(buf), s.indoorBake.w, s.indoorBake.h);
+          const tmp = document.createElement("canvas");
+          tmp.width = s.indoorBake.w;
+          tmp.height = s.indoorBake.h;
+          tmp.getContext("2d")!.putImageData(img, 0, 0);
+          ctx.save();
+          ctx.translate(ox, oy);
+          ctx.scale(z, z);
+          ctx.imageSmoothingEnabled = false;
+          ctx.drawImage(tmp, 0, 0, s.worldW, s.worldH);
+          ctx.restore();
+        } catch {
+          /* keep going */
+        }
+        const bits = s.indoorBits;
+        if (bits) {
+          ctx.save();
+          ctx.translate(ox, oy);
+          ctx.scale(z, z);
+          ctx.imageSmoothingEnabled = false;
+          drawIndoorRoom(ctx, bits, s.t, s.dayPhase, s.worldW, s.worldH, z);
+          const room = bits.rooms.find((r) => r.id === bits.roomId);
+          if (room && !roomIsLit(bits, bits.roomId)) {
+            drawDarkCone(ctx, room, s.player.x, s.player.y, s.player.rot, false);
+          }
+          ctx.restore();
+        }
       }
 
       if (s.realm === "outdoor") {
@@ -594,6 +685,47 @@ export function CityEngineView() {
           );
         }
 
+        // time-ribbon — additive strip + chromatic split (NeonPurr pillar 2)
+        {
+          const rib = s.ribbon ?? [];
+          if (rib.length >= 2) {
+            const left: { x: number; y: number }[] = [];
+            const right: { x: number; y: number }[] = [];
+            for (let i = 0; i < rib.length; i++) {
+              const a = rib[i]!;
+              const b = rib[Math.min(rib.length - 1, i + 1)]!;
+              const dx = b.x - a.x;
+              const dy = b.y - a.y;
+              const len = Math.hypot(dx, dy) || 1;
+              const age = Math.max(0, 1 - (s.t - a.t) / 0.24);
+              const hw = (1.2 + age * 5.5) * z;
+              const px = ox + a.x * z;
+              const py = oy + a.y * z;
+              left.push({ x: px + (-dy / len) * hw, y: py + (dx / len) * hw });
+              right.push({ x: px - (-dy / len) * hw, y: py - (dx / len) * hw });
+            }
+            const paint = (sx: number, sy: number, fill: string) => {
+              ctx.beginPath();
+              ctx.moveTo(left[0]!.x + sx, left[0]!.y + sy);
+              for (let i = 1; i < left.length; i++) ctx.lineTo(left[i]!.x + sx, left[i]!.y + sy);
+              for (let i = right.length - 1; i >= 0; i--) {
+                ctx.lineTo(right[i]!.x + sx, right[i]!.y + sy);
+              }
+              ctx.closePath();
+              ctx.fillStyle = fill;
+              ctx.fill();
+            };
+            ctx.save();
+            ctx.globalCompositeOperation = "lighter";
+            ctx.globalAlpha = 0.55;
+            paint(0, 0, "rgba(80,255,210,0.55)");
+            ctx.globalAlpha = 0.35;
+            paint(-2, 0, "rgba(255,50,90,0.7)");
+            paint(2, 0, "rgba(50,160,255,0.7)");
+            ctx.restore();
+          }
+        }
+
         // boost trail ghosts
         for (const k of s.boostTrail) {
           const a = Math.max(0, k.life / 0.22);
@@ -603,6 +735,22 @@ export function CityEngineView() {
           ctx.fillStyle = `rgba(62,207,207,${0.28 * a})`;
           ctx.fillRect(-12 * z, -5 * z, 22 * z, 10 * z);
           ctx.restore();
+        }
+
+        for (const lot of s.vaultLots ?? []) {
+          const lx = ox + lot.x * z;
+          const ly = oy + lot.y * z;
+          ctx.fillStyle = "#2a2430";
+          ctx.fillRect(lx, ly, lot.w * z, lot.h * z);
+          ctx.strokeStyle = "rgba(232,168,56,0.7)";
+          ctx.lineWidth = Math.max(1, 1.2 * z);
+          ctx.strokeRect(lx, ly, lot.w * z, lot.h * z);
+          ctx.fillStyle = "rgba(232,168,56,0.95)";
+          ctx.font = `${Math.max(8, 9 * z)}px ui-sans-serif`;
+          ctx.fillText(lot.name, lx + 3, ly - 4);
+          const pulse = 0.45 + 0.35 * Math.sin(s.t * 5);
+          ctx.fillStyle = `rgba(232,168,56,${pulse})`;
+          ctx.fillRect(lx + lot.w * z * 0.35, ly + lot.h * z * 0.72, lot.w * z * 0.3, lot.h * z * 0.22);
         }
 
         for (const sc of s.indoorScenes) {
@@ -674,12 +822,59 @@ export function CityEngineView() {
           ctx.restore();
         }
 
+        // procedural VFX bursts (Craft Lab · smash)
+        for (const b of s.procBursts ?? []) {
+          const frames = framesForBurst(b.kind, b.seed, b.hue, b.intensity);
+          const fi = Math.min(frames.length - 1, Math.floor((b.age / b.life) * frames.length));
+          const fr = frames[fi];
+          if (!fr) continue;
+          const sc = (0.9 + b.intensity * 0.06) * z;
+          ctx.save();
+          ctx.imageSmoothingEnabled = false;
+          ctx.globalCompositeOperation = "lighter";
+          ctx.globalAlpha = 0.95;
+          ctx.drawImage(
+            fr,
+            ox + b.x * z - (fr.width * sc) / 2,
+            oy + b.y * z - (fr.height * sc) / 2,
+            fr.width * sc,
+            fr.height * sc,
+          );
+          ctx.restore();
+        }
+
+        // glass sparks
+        for (const sp of s.sparks ?? []) {
+          const a = Math.max(0, Math.min(1, sp.life * 3));
+          ctx.save();
+          ctx.globalAlpha = a;
+          ctx.strokeStyle = sp.color;
+          ctx.lineWidth = Math.max(1, 1.4 * z);
+          ctx.beginPath();
+          ctx.moveTo(ox + sp.x * z, oy + sp.y * z);
+          ctx.lineTo(ox + (sp.x - sp.vx * 0.04) * z, oy + (sp.y - sp.vy * 0.04) * z);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // ambient motes
+        for (const m of s.motes ?? []) {
+          ctx.globalAlpha = Math.max(0, Math.min(0.7, m.life * 0.45));
+          ctx.fillStyle = m.color;
+          ctx.fillRect(ox + m.x * z, oy + m.y * z, m.size * z, m.size * z);
+        }
+        ctx.globalAlpha = 1;
+
         // combo / smash pops
         ctx.font = `${Math.max(10, 12 * z)}px ui-sans-serif, system-ui`;
         ctx.textAlign = "center";
         for (const pop of s.pops) {
           const u = pop.life / pop.max;
-          const scale = 0.7 + (1 - u) * 0.5;
+          const t = 1 - u;
+          const c1 = 1.70158;
+          const c3 = c1 + 1;
+          const back = 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+          const scale = 0.55 + back * 0.7;
           ctx.save();
           ctx.globalAlpha = Math.max(0, Math.min(1, u));
           ctx.fillStyle = pop.color;
@@ -740,25 +935,74 @@ export function CityEngineView() {
       {
         const px = ox + s.player.x * z;
         const py = oy + s.player.y * z;
+        for (const g of s.ghosts ?? []) {
+          const a = Math.max(0, g.life / g.max);
+          ctx.save();
+          ctx.globalAlpha = a * 0.45;
+          ctx.translate(ox + g.x * z, oy + g.y * z);
+          ctx.rotate(g.rot);
+          ctx.fillStyle = s.player.mode === "drive" ? "#3ecfcf" : "#f472b6";
+          ctx.fillRect(-7 * z, -4 * z, 14 * z, 8 * z);
+          ctx.restore();
+        }
         if (s.player.mode === "foot") {
           const useHero =
             useSignature.getState().nightHeroInEngine &&
             heroImg.current &&
             heroImg.current.complete;
           if (useHero) {
-            const hs = 28 * z;
-            const sq = 1 - (s.squash || 0) * 0.28;
-            ctx.save();
-            ctx.translate(px, py);
-            ctx.rotate(s.player.rot + Math.PI / 2);
-            ctx.scale(1 / sq, sq);
-            ctx.imageSmoothingEnabled = false;
-            ctx.drawImage(heroImg.current!, -hs / 2, -hs * 0.75, hs, hs);
-            ctx.restore();
+            const facings = sliceHeroFacings(heroImg.current!);
+            const sq = (1 - (s.squash || 0) * 0.28) * (s.indoorBits?.sitting ? 0.62 : 1);
+            const moving = s.loco.state === "walk" || s.loco.state === "run";
+            const clip = resolveLocoClip(s.loco.state);
+            if (clip) s.loco.clip = `${clip.name} · ${s.loco.state}`;
+            else s.loco.clip = moving ? "hero-step" : "hero-idle";
             ctx.fillStyle = "rgba(0,0,0,0.35)";
             ctx.beginPath();
-            ctx.ellipse(px, py + 4 * z, 8 * z, 3 * z, 0, 0, Math.PI * 2);
+            ctx.ellipse(px, py + 4 * z, 7 * z, 2.6 * z, 0, 0, Math.PI * 2);
             ctx.fill();
+            const seededWalk = clip?.name.toLowerCase() === "hero · walk";
+            const useLab =
+              !!clip &&
+              clip.canvases.length > 1 &&
+              (s.loco.state !== "walk" && s.loco.state !== "run"
+                ? clip.name.toLowerCase() !== "hero · idle"
+                : !seededWalk || Math.sin(s.player.rot) > 0.35);
+            let drew = false;
+            if (useLab && clip) {
+              drew = drawLocoClip(
+                ctx,
+                clip,
+                s.loco.frame,
+                s.player.rot,
+                px,
+                py,
+                z,
+                sq,
+              );
+            }
+            if (!drew) {
+              drew = drawHeroStep(
+                ctx,
+                facings,
+                s.player.rot,
+                moving,
+                s.loco.frame,
+                px,
+                py,
+                z,
+                sq,
+              );
+            }
+            if (!drew) {
+              drew = drawHeroFacing(ctx, facings, s.player.rot, moving, px, py, z, sq);
+            }
+            if (!drew) {
+              ctx.fillStyle = under ? "#fbbf24" : "#e8a838";
+              ctx.beginPath();
+              ctx.arc(px, py, 7, 0, Math.PI * 2);
+              ctx.fill();
+            }
           } else {
             const sq = 1 - (s.squash || 0) * 0.35;
             ctx.save();
@@ -804,33 +1048,34 @@ export function CityEngineView() {
         ctx.fillStyle = `rgba(255,120,40,${s.smashFlash * 0.25})`;
         ctx.fillRect(0, 0, w, h);
       }
-
-      // chromatic split on big hits — presentation only
-      const chroma = reduced ? 0 : s.chroma || 0;
-      if (chroma > 0.04) {
-        const split = chroma * 6;
-        ctx.save();
-        ctx.globalCompositeOperation = "screen";
-        ctx.globalAlpha = chroma * 0.28;
-        ctx.fillStyle = "#ff2a4a";
-        ctx.fillRect(split, 0, w, h);
-        ctx.fillStyle = "#2ad4ff";
-        ctx.fillRect(-split, 0, w, h);
-        ctx.restore();
+      if ((s.flash || 0) > 0.02 && !reduced) {
+        ctx.fillStyle = `rgba(255,250,240,${s.flash * 0.38})`;
+        ctx.fillRect(0, 0, w, h);
       }
 
-      // boost speed lines
-      if (hud.boosting || (s.player.mode === "drive" && s.wasBoosting)) {
+      // chromatic aberration — real RGB split, not tinted rects
+      const chroma = reduced ? 0 : s.chroma || 0;
+      if (chroma > 0.04) {
+        applyCanvasCA(ctx, w, h, chroma, "prism");
+      } else if (!reduced && (hud.boosting || (s.letterbox || 0) > 0.55)) {
+        applyCanvasCA(ctx, w, h, 0.18 + (s.letterbox || 0) * 0.12, "linear");
+      }
+
+      // boost speed lines — radial streaks
+      if (!reduced && (hud.boosting || (s.player.mode === "drive" && s.wasBoosting) || (s.letterbox || 0) > 0.35)) {
         ctx.save();
-        ctx.globalAlpha = 0.28;
+        ctx.globalAlpha = 0.22 + (s.letterbox || 0) * 0.18;
         ctx.strokeStyle = "#3ecfcf";
-        ctx.lineWidth = 1.25;
-        for (let i = 0; i < 14; i++) {
-          const y0 = ((i * 67 + s.t * 420) % (h + 40)) - 20;
-          const x0 = (i * 97) % w;
+        ctx.lineWidth = 1.2;
+        const cx = w / 2;
+        const cy = h / 2;
+        for (let i = 0; i < 18; i++) {
+          const ang = (i / 18) * Math.PI * 2 + s.t * 0.4;
+          const r0 = 40 + ((i * 47 + s.t * 280) % 80);
+          const r1 = r0 + 36 + (hud.boosting ? 24 : 0);
           ctx.beginPath();
-          ctx.moveTo(x0, y0);
-          ctx.lineTo(x0 - 28, y0 + 10);
+          ctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0);
+          ctx.lineTo(cx + Math.cos(ang) * r1, cy + Math.sin(ang) * r1);
           ctx.stroke();
         }
         ctx.restore();
@@ -843,6 +1088,27 @@ export function CityEngineView() {
         ctx.strokeStyle = `rgba(239,68,68,${0.15 + stars * 0.08 * pulse})`;
         ctx.lineWidth = 2 + stars;
         ctx.strokeRect(4, 4, w - 8, h - 8);
+        if (!reduced) {
+          const strobe = 0.5 + 0.5 * Math.sin(s.t * 14);
+          const gL = ctx.createLinearGradient(0, 0, 90, 0);
+          gL.addColorStop(0, `rgba(239,68,68,${0.12 + stars * 0.05 * strobe})`);
+          gL.addColorStop(1, "rgba(239,68,68,0)");
+          ctx.fillStyle = gL;
+          ctx.fillRect(0, 0, 90, h);
+          const gR = ctx.createLinearGradient(w, 0, w - 90, 0);
+          gR.addColorStop(0, `rgba(56,189,248,${0.12 + stars * 0.05 * (1 - strobe)})`);
+          gR.addColorStop(1, "rgba(56,189,248,0)");
+          ctx.fillStyle = gR;
+          ctx.fillRect(w - 90, 0, 90, h);
+        }
+      }
+
+      const box = reduced ? 0 : s.letterbox || 0;
+      if (box > 0.02) {
+        const bh = (28 + box * 36) * box;
+        ctx.fillStyle = "#050608";
+        ctx.fillRect(0, 0, w, bh);
+        ctx.fillRect(0, h - bh, w, bh);
       }
 
       if (s.showMinimap && s.realm === "outdoor" && mapImg.current) {
@@ -869,6 +1135,8 @@ export function CityEngineView() {
           ctx.fillRect(hx - 1.5, hy - 1.5, 3, 3);
         }
       }
+
+      drawEngineModules(ctx, s, { w, h });
 
       const g = ctx.createRadialGradient(w / 2, h / 2, h * 0.2, w / 2, h / 2, h * 0.75);
       g.addColorStop(0, "rgba(0,0,0,0)");
@@ -909,10 +1177,18 @@ export function CityEngineView() {
           smashCount: s.smashCount,
           profile: s.profile.label,
           questDone: !!s.quest?.completed,
-          rules: useRuleCards.getState().cards.filter((c) => c.enabled).length,
+          rules: s.host.rules().filter((c) => c.enabled).length,
           combo: s.combo,
           boosting: s.player.mode === "drive" && !!(s.keys["ShiftLeft"] || s.keys["ShiftRight"]),
           amb: ambienceLabel(s.dayPhase, s.realm === "indoor"),
+          dialog: s.dialog?.text ?? "",
+          room: s.indoorBits?.rooms.find((r) => r.id === s.indoorBits?.roomId)?.name ?? "",
+          keys: s.indoorBits?.keys.length ?? 0,
+          saved: !!s.indoorBits?.savedAt,
+          ringing: !!s.indoorBits?.phoneRinging,
+          clip: s.loco.clip || s.loco.state,
+          ambient:
+            s.indoorBits?.rooms.find((r) => r.id === s.indoorBits?.roomId)?.ambient ?? "",
         });
       }
     };
@@ -983,11 +1259,24 @@ export function CityEngineView() {
           </div>
           <div className="font-mono text-[10px] text-white/60">
             {hud.realm === "indoor"
-              ? hud.indoorName || "interior"
+              ? [hud.indoorName, hud.room].filter(Boolean).join(" · ") || "interior"
               : hud.mode === "drive"
                 ? `${Math.round(hud.speed)} u/s · city cam`
                 : "walk · street cam"}
           </div>
+          {hud.realm === "indoor" && (
+            <div className="mt-0.5 text-[9px] text-violet-200/80">
+              {hud.keys ? `${hud.keys} key${hud.keys > 1 ? "s" : ""}` : "no keys"}
+              {hud.saved ? " · house kept you" : ""}
+              {hud.ringing ? " · PHONE" : ""}
+              {hud.ambient ? ` · ${hud.ambient}` : ""}
+            </div>
+          )}
+          {hud.clip && (
+            <div className="mt-0.5 font-mono text-[9px] text-amber-200/70">
+              clip · {hud.clip}
+            </div>
+          )}
           {/* Wanted stars */}
           <div className="mt-1 flex items-center justify-end gap-0.5">
             {[0, 1, 2, 3, 4].map((i) => (
@@ -1016,7 +1305,7 @@ export function CityEngineView() {
                 textShadow: "0 0 12px rgba(251,146,60,0.65)",
               }}
             >
-              {hud.combo}× COMBO
+              {hud.combo}× {hud.combo >= 8 ? "OVERDRIVE" : "COMBO"}
             </div>
           )}
           {hud.boosting && (
@@ -1049,6 +1338,12 @@ export function CityEngineView() {
       {hud.hint && (
         <div className="pointer-events-none absolute bottom-24 left-1/2 -translate-x-1/2 rounded-full border border-white/20 bg-black/70 px-3 py-1 text-xs text-amber-200 backdrop-blur">
           {hud.hint}
+        </div>
+      )}
+
+      {hud.dialog && (
+        <div className="pointer-events-none absolute bottom-28 left-1/2 w-[min(92vw,420px)] -translate-x-1/2 rounded-md border border-amber-500/30 bg-black/80 px-3 py-2 text-[12px] leading-relaxed text-amber-50 backdrop-blur">
+          {hud.dialog}
         </div>
       )}
 

@@ -5,13 +5,13 @@ import { Sparkles } from "lucide-react";
 const TIPS = [
   "Spatial scope (Gemini): assets inside a feed plane auto-belong to that folder — the canvas IS the structure.",
 
-  "Wire a Quests plane → full quest tree on the canvas. Export packs JSON for Godot/Unity.",
+  "Wire a Quests plane → full quest tree on the canvas. Play it here.",
   "Destructibles: smash alley on the plane, then F-smash the same idea in City Engine.",
   "Shared planes: hop on a room with family — cursors live, messages land as canvas notes.",
   "Ctrl+F1…F12 bookmarks jump like StarCraft locations. Minimap for the giant plane.",
   "Indoors: Building icon designs rooms · ◆ doors in City Engine are enterable.",
   "Anim Beast: secondary tails + silhouette cosmetics without a LoRA GPU meltdown.",
-  "Feed planes + wire icons = engine folder structure that matches how you think.",
+  "Feed planes + wire icons = folders that match how you think. This plane is the engine.",
   "This is the foundation — every session we raise what a ‘pixel tool’ can mean.",
 ];
 

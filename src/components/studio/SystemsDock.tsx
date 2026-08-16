@@ -21,11 +21,16 @@ import {
   Aperture,
   Library,
   Waves,
+  Archive,
+  Building2,
 } from "lucide-react";
 import { useRuleCards } from "@/store/rule-cards";
 import { useShaderGraph } from "@/store/shader-graph";
 import { useCategoryPlanes } from "@/store/category-planes";
 import { useCraftLab } from "@/store/craft-lab";
+import { useAssetVault } from "@/store/asset-vault";
+import { useInteriorDistrict } from "@/store/interior-district";
+import { useHauntDistrict } from "@/store/haunt-district";
 import { cn } from "@/lib/utils";
 
 /**
@@ -57,6 +62,10 @@ export function SystemsDock() {
   const catN = useCategoryPlanes((s) => s.planes.length);
   const craftShow = useCraftLab((s) => s.showPanel);
   const boilOn = useCraftLab((s) => s.boilOn);
+  const vaultShow = useAssetVault((s) => s.showPanel);
+  const vaultN = useAssetVault((s) => s.assets.length);
+  const intShow = useInteriorDistrict((s) => s.showPanel);
+  const hauntShow = useHauntDistrict((s) => s.showPanel);
 
   return (
     <div className="pointer-events-none absolute left-2 top-14 z-[45] flex max-w-[220px] flex-col gap-1.5">
@@ -223,6 +232,60 @@ export function SystemsDock() {
             }}
           >
             <Waves size={12} /> Craft
+          </DockBtn>
+          <DockBtn
+            active={vaultShow}
+            title="Asset vault — drop, name, doors, furnish, clipboard"
+            onClick={() => {
+              const v = useAssetVault.getState();
+              const next = !v.showPanel;
+              v.setShowPanel(next);
+              useStudio
+                .getState()
+                .setStatus(next ? "Asset vault · ingest / doors / built" : "Asset vault hidden");
+            }}
+          >
+            <Archive size={12} /> Vault {vaultN || ""}
+          </DockBtn>
+          <DockBtn
+            active={intShow}
+            title="Interior District — room pads are the floor plan"
+            onClick={() => {
+              const st = useInteriorDistrict.getState();
+              if (!st.districts.length) {
+                st.spawnDistrict();
+                const house = useAssetVault.getState().assets.find((a) => a.name === "Shithole House");
+                if (house) st.pullFromVault(house.id);
+                useStudio.getState().setStatus("Interior District · Shithole House on the plane");
+                return;
+              }
+              const next = !st.showPanel;
+              st.setShowPanel(next);
+              useStudio
+                .getState()
+                .setStatus(next ? "Interior District · pull a vault building" : "Interior District hidden");
+            }}
+          >
+            <Building2 size={12} /> Interior
+          </DockBtn>
+          <DockBtn
+            active={hauntShow}
+            title="Haunt District — the house wears its data"
+            onClick={() => {
+              const st = useHauntDistrict.getState();
+              if (!st.districts.length) {
+                st.spawnDistrict();
+                useStudio.getState().setStatus("Haunt District · residues from play");
+                return;
+              }
+              const next = !st.showPanel;
+              st.setShowPanel(next);
+              useStudio
+                .getState()
+                .setStatus(next ? "Haunt District · residues from play" : "Haunt hidden");
+            }}
+          >
+            <Ghost size={12} /> Haunt
           </DockBtn>
           <DockBtn
             active={rulesShow && ruleN > 0}

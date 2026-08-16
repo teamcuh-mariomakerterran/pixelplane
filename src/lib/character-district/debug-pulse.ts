@@ -41,7 +41,6 @@ export function inferStateFromEngine(opts: {
 }): string {
   if (opts.smashing) return "attack";
   if (opts.mode === "drive") return "run";
-  if (opts.indoor) return "walk";
   if (opts.speed > 40) return "run";
   if (opts.speed > 8) return "walk";
   return "idle";

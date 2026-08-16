@@ -59,6 +59,8 @@ type KernelState = {
   toggleLead: (id: string, leadId: string) => void;
   bindGearSheet: (id: string) => void;
   loadQuestTools: (id: string) => void;
+  acquire: (label: string, color?: string) => void;
+  addLead: (title: string, detail: string) => void;
 };
 
 const SLOT_COLORS = [
@@ -330,5 +332,46 @@ export const useKernels = create<KernelState>((set, get) => ({
     useStudio
       .getState()
       .setStatus("Inventory · 8 quest tools loaded (Audio Deck → Access Pass)");
+  },
+
+  acquire: (label, color) => {
+    let id = get().instances.find((k) => k.kind === "inventory")?.id;
+    if (!id) id = get().placeInventory();
+    set((s) => ({
+      instances: s.instances.map((k) => {
+        if (k.id !== id) return k;
+        const slots = [...(k.slots ?? [])];
+        const empty = slots.find((sl) => !sl.filled);
+        if (empty) {
+          empty.filled = true;
+          empty.label = label;
+          if (color) empty.color = color;
+        } else {
+          slots.push({
+            id: uid("slot"),
+            label,
+            filled: true,
+            color: color ?? SLOT_COLORS[slots.length % SLOT_COLORS.length]!,
+          });
+        }
+        return { ...k, slots };
+      }),
+    }));
+    useStudio.getState().setStatus(`Inventory · got ${label}`);
+  },
+
+  addLead: (title, detail) => {
+    let id = get().instances.find((k) => k.kind === "leads")?.id;
+    if (!id) id = get().placeLeads();
+    set((s) => ({
+      instances: s.instances.map((k) => {
+        if (k.id !== id) return k;
+        const leads = [...(k.leads ?? [])];
+        if (leads.some((l) => l.title === title)) return k;
+        leads.unshift({ id: uid("lead"), title, detail, done: false });
+        return { ...k, leads };
+      }),
+    }));
+    useStudio.getState().setStatus(`Lead · ${title}`);
   },
 }));

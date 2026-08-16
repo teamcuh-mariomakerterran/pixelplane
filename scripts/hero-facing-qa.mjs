@@ -1,0 +1,32 @@
+import { chromium } from "playwright";
+
+const b = await chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage"] });
+const p = await b.newPage({ viewport: { width: 1280, height: 800 } });
+const errs = [];
+p.on("pageerror", (e) => errs.push(String(e)));
+p.on("console", (m) => {
+  if (m.type() === "error") errs.push(m.text());
+});
+await p.goto("http://127.0.0.1:8080/", { waitUntil: "networkidle", timeout: 45000 });
+await p.waitForTimeout(1000);
+await p.getByRole("button", { name: "City Engine — drive the city" }).click();
+await p.waitForTimeout(1400);
+const canvas = p.locator("canvas").first();
+await canvas.click({ position: { x: 640, y: 400 } });
+await p.screenshot({ path: "/workspace/screenshots/hero-idle.png" });
+await p.keyboard.down("KeyS");
+await p.waitForTimeout(500);
+await p.screenshot({ path: "/workspace/screenshots/hero-south.png" });
+await p.keyboard.up("KeyS");
+await p.keyboard.down("KeyD");
+await p.waitForTimeout(500);
+await p.screenshot({ path: "/workspace/screenshots/hero-east.png" });
+await p.keyboard.up("KeyD");
+await p.keyboard.down("KeyW");
+await p.waitForTimeout(500);
+await p.screenshot({ path: "/workspace/screenshots/hero-north.png" });
+await p.keyboard.up("KeyW");
+const hud = await p.locator("body").innerText();
+console.log(JSON.stringify({ hud: /ON FOOT|INDOORS|DRIVING/.test(hud), errs: errs.slice(0, 8) }, null, 2));
+await b.close();
+process.exit(errs.length ? 2 : 0);
