@@ -76,8 +76,11 @@ export function HelpModal() {
             save.
           </Block>
           <Block title="Sheet slicer">
-            Select a spritesheet artboard → Inspector → <b>Sheet slicer</b> → set frame size → Slice.
-            Builds a playable animation strip next to the sheet (empty cells skipped).
+            Select a spritesheet artboard → Inspector → <b>Sheet slicer</b>. The slicer auto-detects
+            the grid (the cat is 3×4, RPG walk). <b>Split into clips</b> makes one anim per row
+            (walk-down / left / right / up) plus idle from the standing frame. <b>Make character</b>{" "}
+            parks those clips on Character District pads so Play walks them. One-strip slice is still
+            there if you want a single filmstrip.
           </Block>
           <Block title="Solitaire mini-game">
             Click the <b>Solitaire</b> icon in the top bar to drop a full Klondike table on the plane.

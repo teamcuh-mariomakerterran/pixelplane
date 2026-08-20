@@ -73,6 +73,13 @@ type DistrictStore = {
   addTransition: (fromPadId: string, toPadId: string, condition: string) => void;
   setTransitionCondition: (id: string, condition: string) => void;
   manualBindAnim: (padId: string, animId: string) => void;
+  /** Park idle/walk clips on pads (spatial + manual) so Play picks them. */
+  bindSplitClips: (opts: {
+    name: string;
+    idleId?: string | null;
+    walkIds: string[];
+    origin?: { x: number; y: number };
+  }) => string | null;
   addCollision: (
     animId: string,
     frameIndex: number,
@@ -216,6 +223,90 @@ export const useCharacterDistrict = create<DistrictStore>((set, get) => ({
       })),
     }));
     get().rebindStates();
+  },
+
+  bindSplitClips: ({ name, idleId, walkIds, origin }) => {
+    const studio = useStudio.getState();
+    const anims = studio.animRegions;
+    const idle = idleId ? anims.find((a) => a.id === idleId) : undefined;
+    const walks = walkIds
+      .map((id) => anims.find((a) => a.id === id))
+      .filter((a): a is NonNullable<typeof a> => !!a);
+
+    let d = get().districts.find((x) => x.name.toLowerCase() === name.toLowerCase());
+    if (!d) {
+      const x = origin?.x ?? (idle?.x ?? walks[0]?.x ?? 40) + 220;
+      const y = origin?.y ?? (idle?.y ?? walks[0]?.y ?? 40);
+      d = createCharacterDistrict({ name, x, y });
+      set((s) => ({
+        districts: [...s.districts, d!],
+        activeId: d!.id,
+        showPanel: true,
+      }));
+    } else {
+      set({ activeId: d.id });
+    }
+
+    const district = get().districts.find((x) => x.id === (d?.id ?? get().activeId));
+    if (!district) return null;
+
+    const idlePad = district.statePads.find((p) => p.state === "idle");
+
+    const moves: { id: string; x: number; y: number }[] = [];
+    if (idle && idlePad) {
+      moves.push({
+        id: idle.id,
+        x: district.x + idlePad.x + 24,
+        y: district.y + idlePad.y + 16,
+      });
+    }
+    const strips = district.zones.strips;
+    walks.forEach((w, i) => {
+      const gap = (w.frameW || 32) + 16;
+      moves.push({
+        id: w.id,
+        x: district.x + strips.x + 16 + (i % 4) * gap,
+        y: district.y + strips.y + 36 + Math.floor(i / 4) * ((w.frameH || 32) + 20),
+      });
+    });
+    if (moves.length) {
+      useStudio.setState((s) => ({
+        animRegions: s.animRegions.map((a) => {
+          const m = moves.find((x) => x.id === a.id);
+          return m ? { ...a, x: m.x, y: m.y } : a;
+        }),
+      }));
+    }
+
+    const walkIdsFinal = walks.map((w) => w.id);
+    set((s) => ({
+      districts: s.districts.map((dist) => {
+        if (dist.id !== district.id) return dist;
+        return {
+          ...dist,
+          statePads: dist.statePads.map((p) => {
+            if (p.state === "idle" && idleId) {
+              return { ...p, manualAnimIds: [...new Set([idleId, ...p.manualAnimIds])] };
+            }
+            if (p.state === "walk" && walkIdsFinal.length) {
+              return {
+                ...p,
+                manualAnimIds: [...new Set([...walkIdsFinal, ...p.manualAnimIds])],
+              };
+            }
+            if (p.state === "run" && walkIdsFinal.length && !p.manualAnimIds.length) {
+              return { ...p, manualAnimIds: [walkIdsFinal[0]!] };
+            }
+            return p;
+          }),
+        };
+      }),
+    }));
+    get().rebindStates();
+    useStudio.getState().setStatus(
+      `Character “${name}” · idle + ${walkIdsFinal.length} walk clips on pads`,
+    );
+    return district.id;
   },
 
   addCollision: (animId, frameIndex, kind, box) => {

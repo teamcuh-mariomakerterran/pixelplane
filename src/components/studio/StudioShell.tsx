@@ -156,6 +156,11 @@ export function StudioShell() {
               void saveSnapshot(pickSnapshot(useStudio.getState()));
             }
           }
+          const catBoard = useStudio.getState().artboards.find((b) => /cat/i.test(b.name));
+          if (catBoard && (catBoard.width !== 256 || catBoard.height !== 320)) {
+            await useStudio.getState().rehydrateStarterArt();
+          }
+          useStudio.getState().ensureSheetCharacters();
         }
       } else if (s.artboards.length === 0) {
         seedDemo();

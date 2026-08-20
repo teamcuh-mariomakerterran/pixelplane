@@ -24,6 +24,10 @@ import {
 } from "@/lib/spatial/scope";
 import { buildEnginePackage, downloadBlob } from "@/lib/engine/export-project";
 import { coerceEngineId } from "@/lib/pixel/types";
+import {
+  splitSheetBuffer,
+  clipPrefixFromBoardName,
+} from "@/lib/pixel/sheet-split";
 import type {
   AnimRegion,
   Artboard,
@@ -247,6 +251,19 @@ export type StudioState = {
   exportActivePng: () => void;
   exportAnimSheet: () => void;
   sliceArtboardToAnim: (artboardId: string, frameW: number, frameH: number, opts?: any) => string | null;
+  /** Per-row clips (walk-down / walk-left / …) + idle from standing frame. */
+  splitArtboardToClips: (
+    artboardId: string,
+    opts?: {
+      frameW?: number;
+      frameH?: number;
+      makeCharacter?: boolean;
+      force?: boolean;
+      punchBg?: boolean;
+    },
+  ) => string[];
+  makeCharacterFromSheet: (artboardId: string) => string | null;
+  ensureSheetCharacters: () => { split: number; detail: string };
   duplicateArtboard: (id: string) => string | null;
   applySnapshot: (snap: StudioSnapshot) => void;
   newProject: () => void;
@@ -2001,6 +2018,168 @@ export const useStudio = create<StudioState>((set, get) => ({
     }));
     return anim.id;
   },
+  splitArtboardToClips: (artboardId, opts) => {
+    const board = get().artboards.find((b) => b.id === artboardId);
+    if (!board) {
+      set({ status: "Artboard not found" });
+      return [];
+    }
+    const prefix = clipPrefixFromBoardName(board.name);
+    const already = get().animRegions.filter(
+      (a) =>
+        a.sourceBoardId === board.id ||
+        a.name.toLowerCase().startsWith(prefix.toLowerCase() + " ·"),
+    );
+    if (already.length >= 2 && !opts?.force) {
+      if (opts?.makeCharacter) get().makeCharacterFromSheet(board.id);
+      set({
+        status: `“${board.name}” already split · ${already.length} clips`,
+        activeArtboardId: board.id,
+      });
+      return already.map((a) => a.id);
+    }
+    const comp = compositeLayers(board.layers, board.width, board.height);
+    const split = splitSheetBuffer(comp, board.width, board.height, {
+      frameW: opts?.frameW,
+      frameH: opts?.frameH,
+      punchBg: opts?.punchBg,
+      prefix,
+    });
+    if (!split) {
+      set({ status: `Couldn’t detect a grid on “${board.name}” — set frame size` });
+      return [];
+    }
+    get().pushHistory();
+    const { grid, clips } = split;
+    const originX = board.x + board.width + 28;
+    const originY = board.y;
+    const created = clips.map((clip, i) => ({
+      id: uid("anim"),
+      name: clip.name,
+      x: originX,
+      y: originY + i * (clip.frameH + 18),
+      frameW: clip.frameW,
+      frameH: clip.frameH,
+      frames: clip.frames.map((data) => ({ id: uid("frame"), data })),
+      fps: clip.fps,
+      playing: true,
+      currentFrame: 0,
+      onionSkin: false,
+      loop: true,
+      facing: clip.facing,
+      stateName: clip.state,
+      sourceBoardId: board.id,
+    }));
+    set((s) => ({
+      animRegions: [...s.animRegions, ...created],
+      activeAnimId: created[0]?.id ?? s.activeAnimId,
+      activeArtboardId: board.id,
+      status: `Split “${board.name}” → ${created.length} clips · ${grid.cols}×${grid.rows} ${grid.layout} · ${grid.frameW}×${grid.frameH}`,
+    }));
+    if (opts?.makeCharacter) get().makeCharacterFromSheet(board.id);
+    return created.map((a) => a.id);
+  },
+  makeCharacterFromSheet: (artboardId) => {
+    const board = get().artboards.find((b) => b.id === artboardId);
+    if (!board) return null;
+    let ids = get()
+      .animRegions.filter(
+        (a) =>
+          a.sourceBoardId === board.id ||
+          a.name.toLowerCase().startsWith(clipPrefixFromBoardName(board.name).toLowerCase() + " ·"),
+      )
+      .map((a) => a.id);
+    if (ids.length < 2) {
+      ids = get().splitArtboardToClips(board.id, { makeCharacter: false, force: true });
+    }
+    if (!ids.length) return null;
+    const anims = get().animRegions.filter((a) => ids.includes(a.id));
+    const idle = anims.find((a) => a.stateName === "idle" || /idle/i.test(a.name));
+    const walks = anims.filter((a) => a.id !== idle?.id);
+    const origin = { x: board.x + board.width + 40, y: board.y + board.height + 24 };
+    const payload = {
+      name: clipPrefixFromBoardName(board.name),
+      idleId: idle?.id ?? null,
+      walkIds: walks.map((w) => w.id),
+      origin,
+    };
+    void import("@/store/character-district").then(({ useCharacterDistrict }) => {
+      useCharacterDistrict.getState().bindSplitClips(payload);
+    });
+    if (idle) {
+      const actorAnim = walks[0]?.id ?? idle.id;
+      const exists = get().actors.some((a) => a.animId === actorAnim);
+      if (!exists) {
+        get().placeActorFromAnim(actorAnim, board.x, board.y + board.height + 16);
+      }
+    }
+    const first = idle ?? walks[0];
+    if (first) {
+      const vw = typeof window !== "undefined" ? window.innerWidth : 1280;
+      const vh = typeof window !== "undefined" ? window.innerHeight : 800;
+      set({
+        camera: {
+          zoom: 0.55,
+          x: vw / 2 - (first.x + first.frameW / 2) * 0.55,
+          y: vh / 2 - (first.y + first.frameH / 2) * 0.55,
+        },
+        activeAnimId: first.id,
+      });
+    }
+    return payload.name;
+  },
+  ensureSheetCharacters: () => {
+    const cat = get().artboards.find((b) => /cat/i.test(b.name) && /sheet/i.test(b.name));
+    if (!cat) return { split: 0, detail: "no cat sheet" };
+    const prefix = clipPrefixFromBoardName(cat.name);
+    const have = get().animRegions.filter(
+      (a) =>
+        a.sourceBoardId === cat.id ||
+        a.name.toLowerCase().startsWith(prefix.toLowerCase() + " ·"),
+    );
+    const detected = (() => {
+      try {
+        const comp = compositeLayers(cat.layers, cat.width, cat.height);
+        return splitSheetBuffer(comp, cat.width, cat.height, { prefix, punchBg: true });
+      } catch {
+        return null;
+      }
+    })();
+    const sizeOk =
+      have.length >= 2 &&
+      detected &&
+      have.some(
+        (a) => a.frameW === detected.grid.frameW && a.frameH === detected.grid.frameH,
+      );
+    if (sizeOk) {
+      const idle = have.find((a) => a.stateName === "idle" || /idle/i.test(a.name));
+      const walks = have.filter((a) => a.id !== idle?.id);
+      try {
+        void import("@/store/character-district").then(({ useCharacterDistrict }) => {
+          useCharacterDistrict.getState().bindSplitClips({
+            name: prefix,
+            idleId: idle?.id ?? null,
+            walkIds: walks.map((w) => w.id),
+            origin: { x: cat.x + cat.width + 40, y: cat.y + cat.height + 24 },
+          });
+        });
+      } catch {
+        /* district optional */
+      }
+      return { split: have.length, detail: "already split" };
+    }
+    if (have.length) {
+      set((s) => ({
+        animRegions: s.animRegions.filter((a) => !have.some((h) => h.id === a.id)),
+      }));
+    }
+    const ids = get().splitArtboardToClips(cat.id, {
+      makeCharacter: true,
+      punchBg: true,
+      force: true,
+    });
+    return { split: ids.length, detail: ids.length ? "split + bound" : "detect failed" };
+  },
   duplicateArtboard: (id) => {
     const board = get().artboards.find((b) => b.id === id);
     if (!board) return null;
@@ -2572,7 +2751,7 @@ export const useStudio = create<StudioState>((set, get) => ({
       { name: "Face Left", src: "/starter-pack/characters/rat_ninja_face_left.png", max: 80, bg: true },
       { name: "Step Forward", src: "/starter-pack/characters/rat_ninja_step.jpg", max: 120, bg: true },
       { name: "Neon Alley", src: "/starter-pack/environments/neon_alley.jpg", max: 420 },
-      { name: "Cat Sheet", src: "/starter-pack/sheets/cat_sprite_sheet.png", max: 280 },
+      { name: "Cat Sheet", src: "/starter-pack/sheets/cat_sprite_sheet.png", max: 512 },
       { name: "zeRo.exe", src: "/starter-pack/characters/zero_exe_idle.jpg", max: 120, bg: true },
       { name: "BG · Far City", src: "/starter-pack/environments/parallax_far_city.jpg", max: 360 },
       { name: "BG · Mid Skyline", src: "/starter-pack/environments/parallax_mid_skyline.jpg", max: 360 },
@@ -2592,7 +2771,8 @@ export const useStudio = create<StudioState>((set, get) => ({
       const needs =
         !board ||
         !board.layers?.[0] ||
-        isBufferHollow(board.layers[0].data, board.width, board.height);
+        isBufferHollow(board.layers[0].data, board.width, board.height) ||
+        (item.name === "Cat Sheet" && (board.width !== 256 || board.height !== 320));
       if (!needs && board) {
         // still refresh parallax layer link/data for BG boards
         if (item.name.startsWith("BG ·")) {
@@ -2784,6 +2964,16 @@ export const useStudio = create<StudioState>((set, get) => ({
       activeParallaxId: stacks[0]?.id ?? get().activeParallaxId,
       status: `Starter art · fixed ${fixed}/${catalog.length} · ${stacks[0]?.layers?.length || 0} parallax layers live`,
     });
+    try {
+      const cat = get().ensureSheetCharacters();
+      if (cat.split) {
+        set({
+          status: `Starter art · fixed ${fixed}/${catalog.length} · cat ${cat.detail}`,
+        });
+      }
+    } catch {
+      /* */
+    }
     return { fixed, total: catalog.length };
   },
 }));
@@ -2859,7 +3049,7 @@ async function hydrateStarterDemo(get: () => StudioState, set: any) {
       name: "Cat Sheet",
       x: 1480,
       y: 40,
-      max: 280,
+      max: 512,
       kind: "sheet",
       bg: false
     },
@@ -3047,6 +3237,11 @@ async function hydrateStarterDemo(get: () => StudioState, set: any) {
       },
       status: `Huge plane · ${boards.length} assets · ${pLayers.length} parallax layers · scroll-wheel zoom 2%–6400%`
     });
+    try {
+      get().ensureSheetCharacters();
+    } catch {
+      /* split is best-effort on first seed */
+    }
   } catch {
     set({ status: "Demo ready — open Pack to drop free-use art" });
   }

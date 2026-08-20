@@ -623,6 +623,49 @@ export function CommandPalette() {
         },
       },
       {
+        id: "split-sheet",
+        group: "Suite",
+        label: "Split sheet into clips",
+        hint: "per row · idle from standing",
+        keywords: "split cat sheet clips walk idle slicer character",
+        run: () => {
+          const s = useStudio.getState();
+          const id = s.activeArtboardId;
+          if (!id) {
+            s.setStatus("Select a spritesheet first");
+            return;
+          }
+          s.splitArtboardToClips(id, { punchBg: true });
+        },
+      },
+      {
+        id: "make-character",
+        group: "Suite",
+        label: "Make character from sheet",
+        hint: "split + bind pads",
+        keywords: "make character cat bind idle walk district",
+        run: () => {
+          const s = useStudio.getState();
+          const id = s.activeArtboardId;
+          if (!id) {
+            s.setStatus("Select a spritesheet first");
+            return;
+          }
+          s.makeCharacterFromSheet(id);
+        },
+      },
+      {
+        id: "split-cat",
+        group: "Suite",
+        label: "Split the cat (demo sheet)",
+        hint: "detect 3×4 · bind Cat district",
+        keywords: "cat split sheet character walk",
+        run: () => {
+          const r = useStudio.getState().ensureSheetCharacters();
+          useStudio.getState().setStatus(`Cat · ${r.detail} (${r.split} clips)`);
+        },
+      },
+      {
         id: "citydist",
         group: "Suite",
         label: "City District",

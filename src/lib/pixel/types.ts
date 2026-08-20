@@ -78,6 +78,10 @@ export type AnimRegion = {
   loop?: boolean;
   onionSkin?: boolean;
   beast?: AnimBeastMeta;
+  /** Sheet-split extras — facing + state so Play can pick a clip by direction. */
+  facing?: string | null;
+  stateName?: string | null;
+  sourceBoardId?: string | null;
   [key: string]: unknown;
 };
 

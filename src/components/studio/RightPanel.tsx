@@ -28,6 +28,7 @@ import { listFoldersFlat, WIRE_CATEGORY_META } from "@/lib/engine/templates";
 import { saveSnapshot, pickSnapshot, clearSnapshot } from "@/lib/pixel/persist";
 import { formatChord } from "@/lib/hotkeys/defaults";
 import { ANIM_LIBRARY_PRESETS } from "@/lib/anim-lab/doctrine";
+import { detectSheetGrid } from "@/lib/pixel/sheet-split";
 import { scopeForZone, formatScopeSummary } from "@/lib/spatial/scope";
 import { getParticleStats } from "@/lib/pixel/particles-draw";
 import { resolveSpatialOwner } from "@/lib/spatial/priority";
@@ -990,17 +991,46 @@ function SheetSlicer({
   boardW: number;
   boardH: number;
 }) {
-  const [fw, setFw] = useState(32);
-  const [fh, setFh] = useState(32);
+  const board = useStudio((s) => s.artboards.find((b) => b.id === boardId));
   const slice = useStudio((s) => s.sliceArtboardToAnim);
+  const splitClips = useStudio((s) => s.splitArtboardToClips);
+  const makeChar = useStudio((s) => s.makeCharacterFromSheet);
+
+  const detected = (() => {
+    try {
+      const data = board?.layers?.[0]?.data;
+      return detectSheetGrid(boardW, boardH, data);
+    } catch {
+      return null;
+    }
+  })();
+
+  const [fw, setFw] = useState(detected?.frameW ?? 32);
+  const [fh, setFh] = useState(detected?.frameH ?? 32);
+  const [usedDetect, setUsedDetect] = useState(false);
+
+  useEffect(() => {
+    if (detected && !usedDetect) {
+      setFw(detected.frameW);
+      setFh(detected.frameH);
+      setUsedDetect(true);
+    }
+  }, [detected, usedDetect, boardId]);
+
+  useEffect(() => {
+    setUsedDetect(false);
+  }, [boardId]);
+
   const cols = Math.floor(boardW / fw);
   const rows = Math.floor(boardH / fh);
   const est = Math.max(0, cols * rows);
+  const names = detected?.rowNames?.slice(0, 6) ?? [];
 
   return (
     <div className="space-y-2 px-3 pb-3">
       <p className="text-[10px] leading-snug text-subtle">
-        Cut a spritesheet into an animation strip. Empty cells are skipped.
+        Cut a spritesheet into <b className="text-muted">named clips</b> — one anim per row.
+        Idle comes from the standing frame of walk-down. Empty cells skipped.
       </p>
       <div className="grid grid-cols-2 gap-2">
         <label className="text-[10px] text-muted">
@@ -1027,7 +1057,7 @@ function SheetSlicer({
         </label>
       </div>
       <div className="flex flex-wrap gap-1">
-        {[16, 24, 32, 48, 64].map((n) => (
+        {[16, 24, 32, 48, 64, 80].map((n) => (
           <button
             key={n}
             type="button"
@@ -1040,17 +1070,52 @@ function SheetSlicer({
             {n}²
           </button>
         ))}
+        {detected && (
+          <button
+            type="button"
+            onClick={() => {
+              setFw(detected.frameW);
+              setFh(detected.frameH);
+            }}
+            className="rounded border border-accent/40 bg-accent/10 px-1.5 py-0.5 text-[9px] text-accent hover:border-accent"
+          >
+            auto {detected.cols}×{detected.rows}
+          </button>
+        )}
       </div>
       <p className="font-mono text-[10px] text-subtle">
-        {boardW}×{boardH} → ~{est} cells ({cols}×{rows})
+        {boardW}×{boardH} → {cols}×{rows} cells · {fw}×{fh}
+        {detected ? ` · ${detected.layout}` : ""}
       </p>
+      {names.length > 0 && (
+        <p className="text-[10px] leading-snug text-muted">
+          {names.join(" · ")}
+          {detected && detected.rowNames.length > names.length ? " · …" : ""}
+          {" · idle"}
+        </p>
+      )}
       <button
         type="button"
-        onClick={() => slice(boardId, fw, fh)}
+        onClick={() => splitClips(boardId, { frameW: fw, frameH: fh, punchBg: true })}
         className="flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-sm)] bg-accent py-1.5 text-[11px] font-semibold text-accent-fg"
       >
         <Scissors size={12} />
-        Slice to animation
+        Split into clips
+      </button>
+      <button
+        type="button"
+        onClick={() => makeChar(boardId)}
+        className="flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border border-accent/40 bg-accent/10 py-1.5 text-[11px] font-semibold text-accent hover:bg-accent/20"
+      >
+        <Sparkles size={12} />
+        Make character
+      </button>
+      <button
+        type="button"
+        onClick={() => slice(boardId, fw, fh)}
+        className="flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-sm)] border border-border py-1 text-[10px] text-muted hover:text-fg"
+      >
+        Slice to one strip
       </button>
     </div>
   );

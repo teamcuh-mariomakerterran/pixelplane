@@ -950,64 +950,42 @@ export function CityEngineView() {
             useSignature.getState().nightHeroInEngine &&
             heroImg.current &&
             heroImg.current.complete;
-          if (useHero) {
+          const sq = (1 - (s.squash || 0) * 0.28) * (s.indoorBits?.sitting ? 0.62 : 1);
+          const moving = s.loco.state === "walk" || s.loco.state === "run";
+          const clip = resolveLocoClip(s.loco.state, s.player.rot);
+          if (clip) s.loco.clip = `${clip.name} · ${s.loco.state}`;
+          else s.loco.clip = moving ? "hero-step" : "hero-idle";
+          ctx.fillStyle = "rgba(0,0,0,0.35)";
+          ctx.beginPath();
+          ctx.ellipse(px, py + 4 * z, 7 * z, 2.6 * z, 0, 0, Math.PI * 2);
+          ctx.fill();
+          const authored = !!clip && !clip.name.toLowerCase().startsWith("hero ·");
+          let drew = false;
+          if (clip && (authored || clip.source === "lab")) {
+            drew = drawLocoClip(ctx, clip, s.loco.frame, s.player.rot, px, py, z, sq);
+          }
+          if (!drew && useHero) {
             const facings = sliceHeroFacings(heroImg.current!);
-            const sq = (1 - (s.squash || 0) * 0.28) * (s.indoorBits?.sitting ? 0.62 : 1);
-            const moving = s.loco.state === "walk" || s.loco.state === "run";
-            const clip = resolveLocoClip(s.loco.state);
-            if (clip) s.loco.clip = `${clip.name} · ${s.loco.state}`;
-            else s.loco.clip = moving ? "hero-step" : "hero-idle";
-            ctx.fillStyle = "rgba(0,0,0,0.35)";
-            ctx.beginPath();
-            ctx.ellipse(px, py + 4 * z, 7 * z, 2.6 * z, 0, 0, Math.PI * 2);
-            ctx.fill();
-            const seededWalk = clip?.name.toLowerCase() === "hero · walk";
-            const useLab =
-              !!clip &&
-              clip.canvases.length > 1 &&
-              (s.loco.state !== "walk" && s.loco.state !== "run"
-                ? clip.name.toLowerCase() !== "hero · idle"
-                : !seededWalk || Math.sin(s.player.rot) > 0.35);
-            let drew = false;
-            if (useLab && clip) {
-              drew = drawLocoClip(
-                ctx,
-                clip,
-                s.loco.frame,
-                s.player.rot,
-                px,
-                py,
-                z,
-                sq,
-              );
-            }
-            if (!drew) {
-              drew = drawHeroStep(
-                ctx,
-                facings,
-                s.player.rot,
-                moving,
-                s.loco.frame,
-                px,
-                py,
-                z,
-                sq,
-              );
-            }
+            drew = drawHeroStep(
+              ctx,
+              facings,
+              s.player.rot,
+              moving,
+              s.loco.frame,
+              px,
+              py,
+              z,
+              sq,
+            );
             if (!drew) {
               drew = drawHeroFacing(ctx, facings, s.player.rot, moving, px, py, z, sq);
             }
-            if (!drew) {
-              ctx.fillStyle = under ? "#fbbf24" : "#e8a838";
-              ctx.beginPath();
-              ctx.arc(px, py, 7, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          } else {
-            const sq = 1 - (s.squash || 0) * 0.35;
+          }
+          if (!drew) {
+            const blobSq = 1 - (s.squash || 0) * 0.35;
             ctx.save();
             ctx.translate(px, py);
-            ctx.scale(1 / sq, sq);
+            ctx.scale(1 / blobSq, blobSq);
             ctx.fillStyle = under ? "#fbbf24" : "#e8a838";
             ctx.beginPath();
             ctx.arc(0, 0, 7, 0, Math.PI * 2);

@@ -14,11 +14,15 @@ import type { AnimFrame, AnimRegion } from "@/lib/pixel/types";
 
 export type LocoState = "idle" | "walk" | "run" | "attack";
 
+export type Cardinal = "down" | "left" | "right" | "up";
+
 export type LocoClip = {
   name: string;
   canvases: HTMLCanvasElement[];
   fps: number;
   source: "lab" | "hero";
+  facing?: string | null;
+  flipX?: boolean;
 };
 
 const canvasCache = new Map<string, HTMLCanvasElement[]>();
@@ -109,18 +113,84 @@ function findAnimByName(names: string[]): AnimRegion | undefined {
   );
 }
 
-function districtClip(state: LocoState): AnimRegion | undefined {
+function districtClips(state: LocoState): AnimRegion[] {
   try {
     const districts = useCharacterDistrict.getState().districts;
-    const d = districts[0];
-    if (!d) return undefined;
-    const pad = d.statePads.find((p) => p.state === state);
-    const id = pad?.manualAnimIds[0] ?? pad?.animIds[0];
-    if (!id) return undefined;
-    return useStudio.getState().animRegions.find((a) => a.id === id);
+    const anims = useStudio.getState().animRegions;
+    const out: AnimRegion[] = [];
+    const seen = new Set<string>();
+    for (const d of districts) {
+      const pad = d.statePads.find((p) => p.state === state);
+      const ids = [...(pad?.manualAnimIds ?? []), ...(pad?.animIds ?? [])];
+      for (const id of ids) {
+        if (seen.has(id)) continue;
+        const a = anims.find((x) => x.id === id);
+        if (a?.frames.length) {
+          seen.add(id);
+          out.push(a);
+        }
+      }
+    }
+    return out;
   } catch {
-    return undefined;
+    return [];
   }
+}
+
+/** 0 = east / +X, clockwise, canvas Y-down → south. */
+export function cardinalFromRot(rot: number): Cardinal {
+  const twoPi = Math.PI * 2;
+  let a = rot % twoPi;
+  if (a < 0) a += twoPi;
+  const sector = Math.round(a / (Math.PI / 2)) % 4;
+  return (["right", "down", "left", "up"] as const)[sector]!;
+}
+
+function clipFacing(anim: AnimRegion): string | null {
+  const tagged = (anim.facing as string | null | undefined) ?? null;
+  if (tagged) return tagged.toLowerCase();
+  const n = anim.name.toLowerCase();
+  for (const dir of ["down", "left", "right", "up", "south", "west", "east", "north"]) {
+    if (n.includes(dir)) {
+      if (dir === "south") return "down";
+      if (dir === "west") return "left";
+      if (dir === "east") return "right";
+      if (dir === "north") return "up";
+      return dir;
+    }
+  }
+  return null;
+}
+
+function isHeroSeed(name: string): boolean {
+  return name.toLowerCase().startsWith("hero ·");
+}
+
+function toLoco(anim: AnimRegion, state: LocoState, source: "lab" | "hero" = "lab"): LocoClip {
+  return {
+    name: anim.name,
+    canvases: canvasesForAnim(anim),
+    fps: anim.fps || (state === "run" ? 12 : state === "walk" ? 10 : 6),
+    source,
+    facing: clipFacing(anim),
+    flipX: false,
+  };
+}
+
+function pickFacing(anims: AnimRegion[], cardinal: Cardinal, state: LocoState): AnimRegion | undefined {
+  const aliases: Record<Cardinal, string[]> = {
+    down: ["down", "south", "s"],
+    left: ["left", "west", "w"],
+    right: ["right", "east", "e"],
+    up: ["up", "north", "n"],
+  };
+  const keys = aliases[cardinal];
+  return anims.find((a) => {
+    const f = clipFacing(a);
+    if (f && keys.includes(f)) return true;
+    const n = a.name.toLowerCase();
+    return keys.some((k) => n.includes(`walk-${k}`) || n.endsWith(` ${k}`) || n.includes(`-${k}`));
+  }) ?? anims.find((a) => !isHeroSeed(a.name) && (state !== "idle" || /idle/i.test(a.name)));
 }
 
 export function inferLoco(opts: {
@@ -136,31 +206,38 @@ export function inferLoco(opts: {
   return "idle";
 }
 
-export function resolveLocoClip(state: LocoState): LocoClip | null {
-  const bound = districtClip(state);
-  if (bound && bound.frames.length) {
-    return {
-      name: bound.name,
-      canvases: canvasesForAnim(bound),
-      fps: bound.fps || (state === "run" ? 12 : state === "walk" ? 10 : 6),
-      source: "lab",
-    };
+export function resolveLocoClip(state: LocoState, rot = 0): LocoClip | null {
+  const cardinal = cardinalFromRot(rot);
+  const bound = districtClips(state);
+  if (bound.length) {
+    const authored = bound.filter((a) => !isHeroSeed(a.name));
+    const pool = authored.length ? authored : bound;
+    const picked =
+      state === "walk" || state === "run"
+        ? pickFacing(pool, cardinal, state) ?? pool[0]
+        : pool.find((a) => /idle/i.test(a.name) || a.stateName === "idle") ?? pool[0];
+    if (picked) return toLoco(picked, state, "lab");
   }
+
+  if (state === "walk" || state === "run") {
+    const named = findAnimByName([
+      `walk-${cardinal}`,
+      `cat · walk-${cardinal}`,
+      `hero · walk-${cardinal}`,
+    ]);
+    if (named) return toLoco(named, state, isHeroSeed(named.name) ? "hero" : "lab");
+  }
+
   const named =
     state === "walk"
-      ? findAnimByName(["hero · walk", "hero walk", "walk"])
+      ? findAnimByName(["cat · walk-down", "walk-down", "hero · walk", "hero walk", "walk"])
       : state === "run"
         ? findAnimByName(["hero · run", "hero run", "run"])
         : state === "attack"
           ? findAnimByName(["hero · attack", "attack", "smash"])
-          : findAnimByName(["hero · idle", "hero idle", "idle"]);
+          : findAnimByName(["cat · idle", "hero · idle", "hero idle", "idle"]);
   if (named && named.frames.length) {
-    return {
-      name: named.name,
-      canvases: canvasesForAnim(named),
-      fps: named.fps || 8,
-      source: "lab",
-    };
+    return toLoco(named, state, isHeroSeed(named.name) ? "hero" : "lab");
   }
   return null;
 }
@@ -276,9 +353,10 @@ export function drawLocoClip(
   if (!clip.canvases.length) return false;
   const cell = clip.canvases[frame % clip.canvases.length];
   if (!cell) return false;
-  const h = 26 * zoom * squash;
+  const authored = clip.source === "lab" && !clip.name.toLowerCase().startsWith("hero ·");
+  const h = (authored ? 36 : 26) * zoom * squash;
   const w = h * (cell.width / Math.max(1, cell.height));
-  const facingWest = Math.cos(rot) < -0.15;
+  const facingWest = clip.flipX ?? (!clip.facing && Math.cos(rot) < -0.15);
   ctx.save();
   ctx.imageSmoothingEnabled = false;
   ctx.translate(x, y - h * 0.38);

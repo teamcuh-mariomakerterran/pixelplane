@@ -222,12 +222,12 @@ Bring back a visible Studio:
 **Pass:** pixels draw, pan/zoom, brush on an artboard, undo.
 
 ### Phase 2 — Anim + Character District
-- Anim regions + sheet slicer (`sliceArtboardToAnim`)
+- Anim regions + sheet slicer (`sliceArtboardToAnim`, `splitArtboardToClips`, `src/lib/pixel/sheet-split.ts`)
 - Character District layout + state pads (`lib/character-district/*`)
 - Lab locomotion (`lab-locomotion.ts`, `hero-sheet.ts`)
 - **Never** draw a whole 8-dir sheet as one sprite (the “8 views in a square” bug). Slice per facing.
 
-**Pass:** slice a sheet → looping strip. Idle/walk pads bind. Player in Play is a **single** character.
+**Pass:** slice a sheet → **named clips per row**, idle from standing, pads bind. Player in Play is a **single** character that faces the walk direction.
 
 ### Phase 3 — City Engine clock
 - `sim.ts` `EngineState` + `createEngineState` + `step`
@@ -270,7 +270,7 @@ Quality: **Solid** = demo-ready · **Foundation** = live, deepen · **Lite** = s
 | Layers | **Solid** | add / dup / delete / merge / vis / lock / opacity |
 | Artboards | **Solid** | kinds: sheet / scene / hud / note / skin_template / indoor |
 | Anim regions | **Solid** | drag A, fps, onion, play, export sheet |
-| Sheet slicer | **Solid** | inspector → frame size → one strip, skip empty. **Does not yet split a sheet into per-row clips** (cat sheet request — next, see §13) |
+| Sheet slicer | **Solid** | Inspector auto-detects cols×rows. **Split into clips** = one anim per row (`walk-down` / left / right / up) + idle from standing frame of down. **Make character** parks clips on Character District pads. One-strip slice still available. Cat demo sheet (3×4 RPG) auto-splits on boot. |
 | Place actors | **Solid** | T — live looping actor on plane |
 | Particles | **Lite** | procedural kinds; not a full particle lab |
 | Parallax | **Solid** | depth scroll; rain-city demo |
@@ -323,7 +323,7 @@ Quality: **Solid** = demo-ready · **Foundation** = live, deepen · **Lite** = s
 Zones: DNA · Facing · Strips · Logic.  
 State pads: idle / walk / run / attack / hurt / death. Location = bind; manual bind exception.  
 Live: hitbox onion (G hurt / R hit / B push), gravity compose, dual bake export, audio anchors, springs preview, ghost pulse from City Engine.  
-Engine: idle/walk/run clips play on the player. Empty lab auto-seeds **Hero · idle / Hero · walk** from Night District 8-dir sheet + procedural step. **Single-cell draw** (fixed 2026-08-16).
+Engine: idle/walk/run clips play on the player, **facing-aware** (`walk-down` / left / right / up from rot). Empty lab auto-seeds **Hero · idle / Hero · walk** from Night District 8-dir sheet + procedural step. Authored clips (Cat, etc.) win over the hero seed. **Single-cell draw** (fixed 2026-08-16).
 
 ### 5.6 Interior / Haunt / City / Vault
 - **Vault:** named assets, doors, rooms, fixtures, lights. Persist `pixelplane_vault_v1`. Atlus punch + raw JPEGs under `public/vault/`.
@@ -386,14 +386,15 @@ P2P room codes, cursors, canvas messages, layer-branch share, look-at beacons, i
 | `src/lib/city-engine/indoors.ts` | Builtin rooms |
 | `src/lib/city-engine/house-memory.ts` | Persist IndoorBits |
 | `src/lib/city-engine/vault-runtime.ts` | Lots, compile rooms, connectors |
-| `src/lib/city-engine/lab-locomotion.ts` | Idle/walk/run from district or hero sheet |
+| `src/lib/city-engine/lab-locomotion.ts` | Idle/walk/run from district or hero sheet; cardinal facing |
 | `src/lib/city-engine/hero-sheet.ts` | 8-dir slice + single-cell draw |
 | `src/lib/city-engine/quest-runtime.ts` | Studio tree → mission |
 | `src/lib/city-engine/heat.ts` | Wanted, pursuit, street decor |
 | `src/lib/city-engine/perspective.ts` | Profile ladder. `fps_raycast` is **authored** (absorb), not a rewrite |
 | `src/lib/engine/templates.ts` | Play-project folders on this plane (`EngineId = pixelplane`) |
 | `src/lib/engine/parallax.ts` | Native depth → scroll_factor. No other-engine packs |
-| `src/lib/pixel/types.ts` | Desk types. `coerceEngineId` kills legacy godot/unity ids |
+| `src/lib/pixel/sheet-split.ts` | Grid detect + per-row clips + idle-from-standing |
+| `src/lib/pixel/types.ts` | Desk types. `coerceEngineId` kills legacy godot/unity ids. AnimRegion has `facing` / `stateName` / `sourceBoardId` |
 | `src/lib/city-engine/config.ts` | Map scale, vehicle defs |
 | `src/lib/city-engine/world-props.ts` | Smashables |
 | `src/lib/city-engine/footing.ts` | Sub-tile collision |
@@ -503,7 +504,7 @@ F-keys treat the canvas like a studio floor: F1 characters, F2 anims, F3 world, 
 
 | Item | Status | Next |
 |------|--------|------|
-| Sheet → **multiple named clips** (per row / per facing) | Slicer dumps **one** strip | Cat sheet split — idle from standing frame, walk-down/left/right/up as separate anims, bind pads |
+| Sheet → **multiple named clips** (per row / per facing) | **Shipped 2026-08-19** | `splitArtboardToClips` + `sheet-split.ts`. Cat 3×4 auto-splits. Idle = standing of down. |
 | `src/lib/city-engine/mods/` | Missing | Create on first outside module |
 | `registerEngineModule` unused | Seam only | First real module = haunt tick or vault lots compile |
 | `vault-runtime` Zustand import | Doctrine leak | Compile lots through host |
@@ -545,11 +546,11 @@ F-keys treat the canvas like a studio floor: F1 characters, F2 anims, F3 world, 
 Brian’s directive: **do not pick only a few signature toys** — own the category. But **order is not optional**. Rebuild phases beat new toys. We are the engine; every feature must leave a seam.
 
 ### Now — next visible ships (designer-facing)
-1. **Cat sheet → character + split clips.** Select Cat Sprite Sheet → detect grid → **Split into clips** (one anim per row/facing). Idle = standing frame of down. Bind Character District idle/walk. This is the authoring loop Brian already tried; the slicer currently jams 12 cells into one strip.
-2. **Sheet slicer 2:** auto-detect cols×rows, name clips (`walk-down`, `walk-left`…), optional “make character from idle.”
+1. ~~**Cat sheet → character + split clips.**~~ **Shipped 2026-08-19.** Select sheet → auto-detect → Split into clips / Make character. Cat demo binds on boot. Play faces `walk-down/left/right/up`.
+2. **Sheet slicer 2 polish:** 8-dir sheets, RMXP 4-frame idle, preview ghost of the grid on the board, trim cell padding.
 3. **Deepen interiors:** more fixture interactions (sit/sleep/phone already exist — make them feel), kitchen leftover as a pattern, second vault house.
 4. **Haunt as a module:** move haunt ingest/tick into `registerEngineModule` so the pattern is proven.
-5. **Autosave v3:** persist districts, vault, rule cards, kernels.
+5. **Autosave v3:** persist districts, vault, rule cards, kernels. (Cat clips rebind on boot as a workaround.)
 6. **Fix double clock + vault Zustand leak** while touching those files.
 
 ### Near (the engine getting serious)
@@ -626,12 +627,12 @@ Create/select an artboard. Brush (B), Eraser (E), Fill (G), Line (L), Rect (R), 
 
 ### Animations (the loop you want)
 1. Drop or select a **sprite sheet**.
-2. Inspector → **Sheet slicer** → set frame size → Slice. (Today this makes **one** strip. Split-into-clips is the next ship.)
+2. Inspector → **Sheet slicer** — it guesses the grid. **Split into clips** makes one anim per row (`walk-down` / left / right / up) plus **idle** from the standing frame. **Make character** parks them on Character District pads.
 3. Or drag an **animation square (A)** on empty plane.
 4. Play/pause, FPS, onion in inspector.
-5. **Character District** (clapperboard): spawn district, park idle/walk strips on the pads.
+5. **Character District** (clapperboard): spawn district, park idle/walk strips on the pads. Location = bind.
 6. **Place (T)** drops a live looping actor.
-7. **Play** — those pads are the player.
+7. **Play** — those pads are the player, and walk clips face the direction you move.
 
 ### Interiors
 Vault / Interior District: rooms are pads. Play: walk to a door, **E**. The house remembers lights, crumbs, leftover food, sit ghosts.
@@ -694,6 +695,14 @@ Inspiration: pix2d (MIT) for *workflow ideas*, not UI chrome.
 ---
 
 ## 17. Changelog (condensed · newest first)
+
+### 2026-08-19 — Cat sheet split · named clips · facing walks
+- Sheet slicer 2: auto-detect grid, **Split into clips** (one anim per row), idle from standing frame of walk-down, **Make character** binds Character District pads.
+- `src/lib/pixel/sheet-split.ts` — RPG Maker 4-dir is first-class (the cat is 256×320 → 3×4 of 85×80).
+- Cat demo sheet no longer downscaled (was 280 max, smashed the grid). Full 256×320, white keyed out per cell.
+- Play picks `walk-down/left/right/up` from player rot. Authored clips beat the Night District hero seed.
+- Ctrl+K: Split sheet / Make character / Split the cat.
+- Boot: `ensureSheetCharacters` splits + binds if the cat isn’t clipped yet.
 
 ### 2026-08-19 — PixelPlane-only engine IDs · FPS is authored
 - `EngineId` is `"pixelplane"` only. Demo/repair defaults, Play-project connect, parallax notes, and ZIP pack no longer name Godot / Unity / Unreal / GameMaker as destinations.
