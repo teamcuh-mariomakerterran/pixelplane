@@ -1,7 +1,7 @@
 // @ts-nocheck
 /**
- * Build an engine-ready project package (ZIP) from wired canvas content.
- * Store-method ZIP (no external dep) for reliable client download.
+ * Pack a play-project ZIP from wired canvas content.
+ * This is a PixelPlane archive — not an export to another engine.
  */
 
 import { compositeLayers } from "@/lib/pixel/buffer";
@@ -450,13 +450,6 @@ export async function buildEnginePackage(ctx: WireExportContext): Promise<Blob> 
     }
   }
 
-  if (project.engine === "godot") {
-    files.push({
-      path: `${root}/project.godot.snippet`,
-      data: `; Paste / merge into your Godot project\nconfig_version=5\n[application]\nconfig/name="${project.name}"\n[rendering]\ntextures/canvas_textures/default_texture_filter=0\n`,
-    });
-  }
-
   files.push({
     path: `${root}/pixelplane_manifest.json`,
     data: JSON.stringify(manifest, null, 2),
@@ -472,11 +465,7 @@ export async function buildEnginePackage(ctx: WireExportContext): Promise<Blob> 
   return buildZip([...map.values()]);
 }
 
-function artRootFallback(project: EngineProject) {
-  if (project.engine === "godot") return "assets/parallax";
-  if (project.engine === "unity") return "Assets/Art/parallax";
-  if (project.engine === "unreal") return "Content/PixelArt/parallax";
-  if (project.engine === "gamemaker") return "sprites/parallax";
+function artRootFallback(_project: EngineProject) {
   return "art/parallax";
 }
 

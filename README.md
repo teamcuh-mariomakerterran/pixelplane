@@ -28,6 +28,7 @@ scripts/safety-snapshot.sh   # typecheck + git commit
 
 ## Snapshot
 
+- 2026-08-19 — EngineId is PixelPlane only; FPS marked authored (absorb, don't rewrite)
 - 2026-08-19 — Compendium v2 rebuild bible + full GitHub push
 - 2026-08-16 — EngineHost, interiors, vault, lab walks
 - 2026-08-13 — juice / wires / craft / audio beds

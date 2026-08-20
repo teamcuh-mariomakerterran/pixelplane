@@ -23,6 +23,7 @@ import {
   scopeForQuest, scopeForZone, formatScopeSummary, suggestQuestDestructibleLinks,
 } from "@/lib/spatial/scope";
 import { buildEnginePackage, downloadBlob } from "@/lib/engine/export-project";
+import { coerceEngineId } from "@/lib/pixel/types";
 import type {
   AnimRegion,
   Artboard,
@@ -1472,7 +1473,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         ...get().meta,
         name: opts.name || get().meta.name
       },
-      status: `Connected ${opts.engine} project "${project.name}" → ${project.rootFolderName}/`
+      status: `Play project "${project.name}" on this plane → ${project.rootFolderName}/`
     });
   },
   disconnectEngine: () => {
@@ -1483,7 +1484,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         folderId: null,
         folderPath: null
       })),
-      status: "Engine disconnected — feed planes kept, destinations cleared"
+      status: "Play project disconnected — feed planes kept, destinations cleared"
     });
   },
   createWireZone: (x, y, w, h, category = "characters") => {
@@ -1818,11 +1819,11 @@ export const useStudio = create<StudioState>((set, get) => ({
     if (!s.engineProject) {
       set({
         showEngineConnect: true,
-        status: "Connect an engine project to export"
+        status: "Connect a play project to pack it"
       });
       return;
     }
-    set({ status: "Packaging engine export…" });
+    set({ status: "Packaging play project…" });
     try {
       downloadBlob(await buildEnginePackage({
         project: s.engineProject,
@@ -1834,7 +1835,7 @@ export const useStudio = create<StudioState>((set, get) => ({
         questTrees: s.questTrees,
         destructibles: s.destructibles
       }), `${s.engineProject.rootFolderName}_pixelplane.zip`);
-      set({ status: `Exported ${s.engineProject.rootFolderName}_pixelplane.zip` });
+      set({ status: `Packed ${s.engineProject.rootFolderName}_pixelplane.zip` });
     } catch (e) {
       console.error(e);
       set({ status: "Export failed — see console" });
@@ -2074,7 +2075,12 @@ export const useStudio = create<StudioState>((set, get) => ({
         ...z,
         trigger: z.trigger ?? { kind: "none", armed: false },
       })),
-      engineProject: snap.engineProject ?? null,
+      engineProject: snap.engineProject
+        ? {
+            ...(snap.engineProject as EngineProject),
+            engine: coerceEngineId((snap.engineProject as EngineProject).engine),
+          }
+        : null,
       questTrees,
       destructibles,
       activeArtboardId: snap.activeArtboardId ?? artboards[0]?.id ?? null,
@@ -2142,7 +2148,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     board.layers[0].rev = 1;
     const engine = createEngineProject({
       name: "PixelPlane Demo Game",
-      engine: "godot",
+      engine: "pixelplane",
       rootFolderName: "pixelplane_demo",
       defaultCharacterSize: 48
     });
@@ -2330,7 +2336,7 @@ export const useStudio = create<StudioState>((set, get) => ({
     if (!engine) {
       engine = createEngineProject({
         name: "PixelPlane Demo Game",
-        engine: "godot",
+        engine: "pixelplane",
         rootFolderName: "pixelplane_demo",
         defaultCharacterSize: 48,
       });

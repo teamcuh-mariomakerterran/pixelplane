@@ -1,7 +1,8 @@
 /**
  * Perspective profiles — engine growth doctrine (§1.2).
  * Current live profile: top-down open-world sandbox.
- * Future: iso, 3/4, true top-down, FPS, RTS… clone this shape, don't fork sim.
+ * Other families (iso, 3/4, FPS) clone this shape — they do not fork sim.
+ * FPS is already-authored Grok work: absorb as a module, do not rewrite from Doom refs.
  */
 
 export type PerspectiveId =
@@ -43,9 +44,10 @@ export type PerspectiveProfile = {
     | "wanted"
     | "traffic"
     | "minimap"
+    | "fps"
   >;
-  /** Status: only one is live runtime today */
-  status: "live" | "blueprint" | "planned";
+  /** live = City Engine today. authored = exists (other Grok session) — absorb, don't invent. */
+  status: "live" | "blueprint" | "planned" | "authored";
 };
 
 /** The birthplace profile — City Engine today */
@@ -120,14 +122,15 @@ export const PERSPECTIVE_CATALOG: PerspectiveProfile[] = [
   },
   {
     id: "fps_raycast",
-    label: "FPS / raycast (Doom-style)",
-    blurb: "Later family — open architecture refs only; modular renderer swap.",
+    label: "FPS / first-person (PixelPlane family)",
+    blurb:
+      "Already programmed with Grok. Absorb as a perspective + EngineModule — do not invent a second runtime, do not rewrite from Doom refs.",
     pixelSizes: [64, 128],
     defaultPixelSize: 64,
     zoom: { exploration: 1, action: 1, interior: 1, lerp: 1 },
-    assetHints: ["Billboard sprites", "Wall textures"],
-    modules: ["foot", "quests"],
-    status: "planned",
+    assetHints: ["Billboard sprites", "Wall textures", "Weapon viewmodels"],
+    modules: ["foot", "quests", "fps"],
+    status: "authored",
   },
 ];
 

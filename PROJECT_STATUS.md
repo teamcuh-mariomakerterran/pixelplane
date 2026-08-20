@@ -2,13 +2,13 @@
 **Date:** 2026-08-19 · **For:** Brian (lead) · Gemini (advisor) · future AI helpers  
 **Builders:** Brian Moore (human lead) + Grok Build (implementer) · Gemini = ideas only, no code
 
-> **Canonical bible:** [`COMPENDIUM.md`](./COMPENDIUM.md) v2.0.0 (2026-08-19). This file is a short snapshot. If it disagrees with the compendium, the compendium wins.
+> **Canonical bible:** [`COMPENDIUM.md`](./COMPENDIUM.md) v2.1.0 (2026-08-19). This file is a short snapshot. If it disagrees with the compendium, the compendium wins.
 
 ---
 
 ## One-liner
 
-**PixelPlane** is an infinite spatial canvas where 2D game art production, animation state machines, quests, destructibles, co-presence, and a symbiotic top-down **City Engine** all live on **one plane** — layout *is* structure. We do not export to Unity/Godot. This plane is the engine.
+**PixelPlane** is an infinite spatial canvas where 2D game art production, animation state machines, quests, destructibles, co-presence, and a symbiotic top-down **City Engine** all live on **one plane** — layout *is* structure. We do not export to Unity/Godot. This plane is the engine. FPS is an already-authored PixelPlane family (Grok-built) — absorb, do not rewrite.
 
 ---
 

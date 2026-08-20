@@ -810,22 +810,14 @@ export function RightPanel() {
                 <p className="font-mono text-[10px] text-indigo-300">→ {parallax.folderPath}</p>
               ) : (
                 <p className="text-[10px] text-subtle">
-                  Select stack + click Parallax wire to bind export folder
+                  Select stack + click Parallax wire to bind play folder
                 </p>
               )}
               {engine && (
                 <p className="text-[10px] leading-snug text-subtle">
-                  Export target:{" "}
+                  Play scroll:{" "}
                   <span className="text-fg">
-                    {engine.engine === "godot"
-                      ? "Parallax2D.scroll_scale"
-                      : engine.engine === "unity"
-                        ? "parallaxEffect (LateUpdate)"
-                        : engine.engine === "unreal"
-                          ? "ScrollFactor"
-                          : engine.engine === "gamemaker"
-                            ? "layer_x/y factors"
-                            : "scroll_factor JSON"}
+                    depth 0 = far/static · 1 = locked to camera
                   </span>
                 </p>
               )}

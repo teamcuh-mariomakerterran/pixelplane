@@ -66,7 +66,7 @@ export function EngineConnectModal() {
 
           <div className="rounded-[var(--radius-sm)] border border-border bg-surface px-3 py-2.5 text-[11px] leading-relaxed text-muted">
             Art on the plane is the game. Feed planes sort characters, rooms, and sheets into
-            folders this project already plays. No Godot, Unity, or Unreal destination.
+            folders this project already plays. Destinations stay here.
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -136,7 +136,7 @@ export function EngineConnectModal() {
               onClick={() =>
                 connectEngine({
                   name,
-                  engine: "generic",
+                  engine: "pixelplane",
                   rootFolderName: root,
                   defaultCharacterSize: charSize,
                 })

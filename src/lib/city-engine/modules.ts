@@ -15,6 +15,10 @@
  *
  * Drop a file in src/lib/city-engine/mods/<id>.ts and call registerEngineModule
  * from it, then import that file from CityEngineView (or a mods/index.ts barrel).
+ *
+ * FPS family: already programmed with Grok. When the source lands, it is a
+ * module + perspective profile (`fps_raycast`, status authored). Do not fork
+ * sim.ts. Do not invent a second runtime. Do not rewrite from Doom refs.
  */
 
 import type { EngineHost } from "./host";

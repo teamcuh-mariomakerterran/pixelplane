@@ -3,7 +3,7 @@
 > **Product:** PixelPlane  
 > **One-liner:** An infinite collage canvas that **is** a 2D game engine — art, animation, systems, interiors, and Play on one plane. Not a pile of disconnected tools. Not an export pipeline to Unity or Godot.  
 > **Status date:** 2026-08-19  
-> **Compendium version:** 2.0.0  
+> **Compendium version:** 2.1.0  
 > **GitHub (private safety backup):** [teamcuh-mariomakerterran/pixelplane](https://github.com/teamcuh-mariomakerterran/pixelplane)  
 > **Rule:** Every material change **must** update this file in the same turn. If you drift, this file is how you come home.
 
@@ -95,7 +95,7 @@ Brian’s product is **not** “another Aseprite clone.”
 1. Complete one perspective blueprint (current: top-down crime sandbox feel).
 2. Freeze it as a game-type template (assets + wiring + camera language + folder defaults).
 3. Repeat for top-down family: true top-down, isometric, angled/oblique 3/4.
-4. Later families: FPS/Doom-style (open architecture refs only), RTS, RPG, puzzle, sports.
+4. Later families: **FPS is already-authored Grok work** — absorb as `fps_raycast` + EngineModule. Do not rewrite from Doom refs. Then RTS, RPG, puzzle, sports.
 5. Far horizon: foundation strong enough for **3D**, not only 2D that *feels* 3D-aware.
 
 **Guided vs Free:** Guided suggests assets/facings/folders from perspective + pixel size. Free: user sets perspective; engine wires toward it with **zero nagging**.
@@ -390,7 +390,10 @@ P2P room codes, cursors, canvas messages, layer-branch share, look-at beacons, i
 | `src/lib/city-engine/hero-sheet.ts` | 8-dir slice + single-cell draw |
 | `src/lib/city-engine/quest-runtime.ts` | Studio tree → mission |
 | `src/lib/city-engine/heat.ts` | Wanted, pursuit, street decor |
-| `src/lib/city-engine/perspective.ts` | Profile ladder |
+| `src/lib/city-engine/perspective.ts` | Profile ladder. `fps_raycast` is **authored** (absorb), not a rewrite |
+| `src/lib/engine/templates.ts` | Play-project folders on this plane (`EngineId = pixelplane`) |
+| `src/lib/engine/parallax.ts` | Native depth → scroll_factor. No other-engine packs |
+| `src/lib/pixel/types.ts` | Desk types. `coerceEngineId` kills legacy godot/unity ids |
 | `src/lib/city-engine/config.ts` | Map scale, vehicle defs |
 | `src/lib/city-engine/world-props.ts` | Smashables |
 | `src/lib/city-engine/footing.ts` | Sub-tile collision |
@@ -518,7 +521,8 @@ F-keys treat the canvas like a studio floor: F1 characters, F2 anims, F3 world, 
 | Kernels/rules/districts in autosave | Not persisted | IDB v3 |
 | Mobile touch | Partial | Pinch zoom, bigger targets |
 | 3D / other perspective profiles | Named | After top-down blueprint is rich |
-| Godot/Unity export UI | Retired | Do not bring back |
+| Godot/Unity/Unreal/GameMaker destination IDs | **Stripped** (2026-08-19) | `EngineId = "pixelplane"` only. Old saves coerce. Do not bring back |
+| FPS family source | **Authored elsewhere** | Grok-built with Brian. Not in this repo / GitHub set. Absorb — do not invent |
 
 **Policy:** no silent half-features. If it is incomplete, it lives here.
 
@@ -578,8 +582,8 @@ Brian’s directive: **do not pick only a few signature toys** — own the categ
 |------|-----|
 | Ship a complete small game **without leaving PixelPlane** | Proof we are the engine |
 | RPG / puzzle / sports templates | After top-down family |
-| FPS family from open raycast refs only | Mechanics free, expression ours |
-| 3D foundation (not a Unity replacement overnight — a seam) | |
+| **Absorb FPS family** (already programmed with Grok) | Lands as `fps_raycast` + EngineModule. Do not start a new FPS from Doom refs |
+| 3D foundation (a seam, not a second product) | |
 | Local model provider when hardware allows | Same plugin slot as PixelLab |
 | Accounts / commercial packaging / curated icon pack at purchase | |
 
@@ -660,7 +664,7 @@ Select an anim → + Tail / Ear / Cloak / Hair / Cape (offline secondary). Cosme
 
 PixelLab = optional cloud provider behind Generate. Key stays in browser settings. Output lands on **our** plane.
 
-Open-world crime-sandbox **mechanics** are not copyrighted; **expression** is. Never ship Rockstar art or decompiled code. Same rule later for FPS (open raycast/Doom-style refs only).
+Open-world crime-sandbox **mechanics** are not copyrighted; **expression** is. Never ship Rockstar art or decompiled code. FPS is **ours** (Grok-built with Brian) — absorb that code; do not clone Doom/id expression.
 
 Inspiration: pix2d (MIT) for *workflow ideas*, not UI chrome.
 
@@ -678,6 +682,8 @@ Inspiration: pix2d (MIT) for *workflow ideas*, not UI chrome.
 | All signature features | Commit to all | Category ownership |
 | Knowledge-first Anim Beast | Yes | Secondary + cosmetics + audit; gen is gas |
 | We are the engine | Yes (2026-08-16) | No Unity/Godot destination |
+| EngineId is PixelPlane only | Yes (2026-08-19) | Leftover godot/unity/unreal/gamemaker IDs stripped |
+| FPS is ours | Yes (2026-08-19) | Absorb Grok-built FPS; do not rewrite |
 | EngineHost inversion | Yes | Stop game state leaking into React |
 | Module intake | Yes | Other AIs land clean |
 | Compendium living doc | Required | Single human + multi-AI continuity |
@@ -688,6 +694,12 @@ Inspiration: pix2d (MIT) for *workflow ideas*, not UI chrome.
 ---
 
 ## 17. Changelog (condensed · newest first)
+
+### 2026-08-19 — PixelPlane-only engine IDs · FPS is authored
+- `EngineId` is `"pixelplane"` only. Demo/repair defaults, Play-project connect, parallax notes, and ZIP pack no longer name Godot / Unity / Unreal / GameMaker as destinations.
+- Old autosaves coerce on restore. Parallax pack is native JSON (`scroll_factor`).
+- FPS perspective `fps_raycast` status **authored** (Grok-built with Brian). Absorb as a module — do not invent a second runtime, do not rewrite from Doom refs.
+- Source of that FPS work is **not** in this repo, GitHub (`pixelplane`, `black-doctrine`, `gridpaw-road-ops`, `toadsnightmareio`), or Drive title search. Need Brian to point at the session/repo/zip.
 
 ### 2026-08-19 — Rebuild bible + GitHub restore point
 - Compendium rewritten as v2.0.0 rebuild bible (current inventory, rebuild order, roadmap, honest gaps).

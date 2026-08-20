@@ -161,7 +161,14 @@ export type ProjectMeta = {
   [key: string]: unknown;
 };
 
-export type EngineId = "godot" | "unity" | "unreal" | "gamemaker" | "generic";
+/** PixelPlane is the only engine. Legacy save IDs coerce here. */
+export type EngineId = "pixelplane";
+
+/** Old autosaves may still say godot / unity / unreal / gamemaker / generic. Those destinations are dead. */
+export function coerceEngineId(_raw?: string | null): EngineId {
+  return "pixelplane";
+}
+
 
 export type WireCategory =
   | "characters"

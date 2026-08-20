@@ -44,7 +44,7 @@ export function HelpModal() {
             Open <b>Play project</b> from the top bar to name the folders this plane already
             plays — characters, animations, interiors, items. Draw a <b>feed plane</b> (W tool)
             around art, or drag a connector from the wire palette. Destinations stay on this
-            plane. PixelPlane is the start-to-finish engine; nothing is packaged for Godot or Unity.
+            plane. PixelPlane is the start-to-finish engine; nothing leaves this plane.
           </Block>
           <Block title="Starter pack">
             Open <b>Pack</b> in the top bar for free-use example art (rats, zeRo.exe, portraits,
